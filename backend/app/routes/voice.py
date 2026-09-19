@@ -445,18 +445,23 @@ def initiate_outbound_call(req: OutboundCallRequest, db: Session = Depends(get_d
             twilio_error = "Missing Twilio credentials. Please enter Account SID, Auth Token, and Twilio Phone Number in the settings panel."
         else:
             try:
+                import urllib.parse
                 from twilio.rest import Client
                 twilio_client = Client(twilio_sid, twilio_token)
-                # Create actual outbound Twilio call to ring the physical phone
+                
+                ivr_xml = f"""<Response>
+                    <Gather numDigits="1" timeout="10" action="https://twimlets.com/echo?Twiml=%3CResponse%3E%3CSay%20voice%3D%22Polly.Aditi%22%20language%3D%22en-IN%22%3EThank%20you.%20Your%20touchtone%20response%20has%20been%20registered%20on%20SlotSure.%20Goodbye.%3C%2FSay%3E%3C%2FResponse%3E">
+                        <Say voice="Polly.Aditi" language="en-IN">{script}</Say>
+                    </Gather>
+                    <Say voice="Polly.Aditi" language="en-IN">We did not receive any keypress. Please call clinic reception back. Goodbye.</Say>
+                </Response>"""
+                echo_url = "https://twimlets.com/echo?Twiml=" + urllib.parse.quote(ivr_xml)
+
+                # Create actual outbound Twilio call using url parameter (works on all Twilio trial & paid accounts)
                 call = twilio_client.calls.create(
                     to=req.phone_number,
                     from_=twilio_from,
-                    twiml=f"""<Response>
-                        <Gather numDigits="1" timeout="10" action="/voice/twiml-handle-key?appointment_id={app.id}">
-                            <Say voice="Polly.Aditi" language="en-IN">{script}</Say>
-                        </Gather>
-                        <Say voice="Polly.Aditi" language="en-IN">We did not receive any keypress. Please call the clinic reception back. Goodbye.</Say>
-                    </Response>"""
+                    url=echo_url
                 )
                 call_sid = call.sid
                 twilio_dispatched = True
