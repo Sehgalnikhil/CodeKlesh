@@ -784,18 +784,12 @@ def initiate_outbound_call(req: OutboundCallRequest, db: Session = Depends(get_d
                     </Response>"""
                     call_url = "https://twimlets.com/echo?Twiml=" + urllib.parse.quote(ivr_xml)
 
-                create_params = {
-                    "to": to_number,
-                    "from_": twilio_from,
-                    "url": call_url,
-                }
-                if public_base:
-                    create_params["status_callback"] = f"{public_base}/voice/twiml-status/{app.id}"
-                    create_params["status_callback_event"] = ["completed", "busy", "no-answer", "canceled", "failed"]
-                    create_params["status_callback_method"] = "POST"
-
-                # Create actual outbound Twilio call using verified public URL
-                call = twilio_client.calls.create(**create_params)
+                # Twilio trial accounts strictly disallow extra callback parameters on calls.create
+                call = twilio_client.calls.create(
+                    to=to_number,
+                    from_=twilio_from,
+                    url=call_url
+                )
                 call_sid = call.sid
                 twilio_dispatched = True
 
