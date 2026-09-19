@@ -228,6 +228,9 @@ export const api = {
     phone_number: string;
     mode?: 'simulator' | 'twilio';
     language?: 'en' | 'hi';
+    twilio_sid?: string;
+    twilio_token?: string;
+    twilio_from?: string;
   }): Promise<{
     call_sid: string;
     status: string;
@@ -248,6 +251,25 @@ export const api = {
       method: 'POST',
       body: JSON.stringify(payload),
     });
+  },
+
+  async saveTelephonyConfig(data: {
+    twilio_sid: string;
+    twilio_token: string;
+    twilio_from: string;
+  }): Promise<{ success: boolean; message: string }> {
+    return request('/voice/telephony-config', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  async getTelephonyConfig(): Promise<{
+    is_configured: boolean;
+    twilio_sid_masked: string;
+    twilio_from: string;
+  }> {
+    return request('/voice/telephony-config');
   },
 
   async recordCallResult(payload: {

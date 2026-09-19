@@ -345,6 +345,9 @@ class OutboundCallRequest(BaseModel):
     phone_number: str
     mode: Optional[str] = "simulator" # "simulator" or "twilio"
     language: Optional[str] = "en"    # "en" or "hi"
+    twilio_sid: Optional[str] = None
+    twilio_token: Optional[str] = None
+    twilio_from: Optional[str] = None
 
 class RecordCallResultRequest(BaseModel):
     appointment_id: int
@@ -352,6 +355,31 @@ class RecordCallResultRequest(BaseModel):
     digits_pressed: str # "1" or "2"
     duration_seconds: int
     notes: Optional[str] = None
+
+class TelephonyConfigRequest(BaseModel):
+    twilio_sid: str
+    twilio_token: str
+    twilio_from: str
+
+@router.post("/telephony-config")
+def save_telephony_config(config: TelephonyConfigRequest):
+    import os
+    os.environ["TWILIO_ACCOUNT_SID"] = config.twilio_sid.strip()
+    os.environ["TWILIO_AUTH_TOKEN"] = config.twilio_token.strip()
+    os.environ["TWILIO_PHONE_NUMBER"] = config.twilio_from.strip()
+    return {"success": True, "message": "Telephony credentials saved successfully"}
+
+@router.get("/telephony-config")
+def get_telephony_config():
+    import os
+    sid = os.getenv("TWILIO_ACCOUNT_SID", "")
+    has_token = bool(os.getenv("TWILIO_AUTH_TOKEN", ""))
+    phone = os.getenv("TWILIO_PHONE_NUMBER", "")
+    return {
+        "is_configured": bool(sid and has_token and phone),
+        "twilio_sid_masked": f"{sid[:6]}...{sid[-4:]}" if len(sid) > 10 else "",
+        "twilio_from": phone
+    }
 
 @router.post("/outbound-call")
 def initiate_outbound_call(req: OutboundCallRequest, db: Session = Depends(get_db)):
@@ -407,31 +435,33 @@ def initiate_outbound_call(req: OutboundCallRequest, db: Session = Depends(get_d
     twilio_dispatched = False
     twilio_error = None
 
-    # Check if Twilio is requested and configured
-    twilio_sid = os.getenv("TWILIO_ACCOUNT_SID")
-    twilio_token = os.getenv("TWILIO_AUTH_TOKEN")
-    twilio_from = os.getenv("TWILIO_PHONE_NUMBER")
+    # Check if Twilio credentials exist from request or environment
+    twilio_sid = (req.twilio_sid or os.getenv("TWILIO_ACCOUNT_SID", "")).strip()
+    twilio_token = (req.twilio_token or os.getenv("TWILIO_AUTH_TOKEN", "")).strip()
+    twilio_from = (req.twilio_from or os.getenv("TWILIO_PHONE_NUMBER", "")).strip()
 
-    if req.mode == "twilio" and twilio_sid and twilio_token and twilio_from:
-        try:
-            from twilio.rest import Client
-            twilio_client = Client(twilio_sid, twilio_token)
-            # Create outbound Twilio call
-            # Note: in real deployment, url points to public ngrok/domain /voice/twiml-ivr
-            call = twilio_client.calls.create(
-                to=req.phone_number,
-                from_=twilio_from,
-                twiml=f"""<Response>
-                    <Gather numDigits="1" timeout="10" action="/voice/twiml-handle-key?appointment_id={app.id}">
-                        <Say voice="Polly.Aditi" language="en-IN">{script}</Say>
-                    </Gather>
-                    <Say voice="Polly.Aditi" language="en-IN">We did not receive any keypress. Please call the clinic reception back. Goodbye.</Say>
-                </Response>"""
-            )
-            call_sid = call.sid
-            twilio_dispatched = True
-        except Exception as e:
-            twilio_error = str(e)
+    if req.mode == "twilio":
+        if not (twilio_sid and twilio_token and twilio_from):
+            twilio_error = "Missing Twilio credentials. Please enter Account SID, Auth Token, and Twilio Phone Number in the settings panel."
+        else:
+            try:
+                from twilio.rest import Client
+                twilio_client = Client(twilio_sid, twilio_token)
+                # Create actual outbound Twilio call to ring the physical phone
+                call = twilio_client.calls.create(
+                    to=req.phone_number,
+                    from_=twilio_from,
+                    twiml=f"""<Response>
+                        <Gather numDigits="1" timeout="10" action="/voice/twiml-handle-key?appointment_id={app.id}">
+                            <Say voice="Polly.Aditi" language="en-IN">{script}</Say>
+                        </Gather>
+                        <Say voice="Polly.Aditi" language="en-IN">We did not receive any keypress. Please call the clinic reception back. Goodbye.</Say>
+                    </Response>"""
+                )
+                call_sid = call.sid
+                twilio_dispatched = True
+            except Exception as e:
+                twilio_error = str(e)
 
     return {
         "call_sid": call_sid,

@@ -17,7 +17,13 @@ import {
   Send,
   RotateCcw,
   Check,
-  X
+  X,
+  Settings,
+  HelpCircle,
+  ChevronDown,
+  ChevronUp,
+  ExternalLink,
+  Signal
 } from 'lucide-react';
 import { Appointment } from '../../types';
 import { api } from '../../api/client';
@@ -44,6 +50,14 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
   const [callLanguage, setCallLanguage] = useState<'en' | 'hi'>('en');
   const [callMode, setCallMode] = useState<'simulator' | 'twilio'>('simulator');
   
+  // Twilio Telephony Credentials
+  const [isTwilioConfigOpen, setIsTwilioConfigOpen] = useState<boolean>(false);
+  const [twilioSid, setTwilioSid] = useState<string>('');
+  const [twilioToken, setTwilioToken] = useState<string>('');
+  const [twilioFrom, setTwilioFrom] = useState<string>('');
+  const [isTwilioConfigured, setIsTwilioConfigured] = useState<boolean>(false);
+  const [twilioError, setTwilioError] = useState<string | null>(null);
+
   // Call Lifecycle States
   const [callState, setCallState] = useState<'IDLE' | 'RINGING' | 'IN_CALL' | 'COMPLETED'>('IDLE');
   const [callTimer, setCallTimer] = useState<number>(0);
@@ -51,12 +65,12 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
   const [callSid, setCallSid] = useState<string>('');
   const [callResult, setCallResult] = useState<any>(null);
   const [isProcessingKey, setIsProcessingKey] = useState<boolean>(false);
+  const [twilioDispatchedSuccess, setTwilioDispatchedSuccess] = useState<boolean>(false);
 
   const synthRef = useRef<SpeechSynthesis | null>(null);
   const timerRef = useRef<any>(null);
-  const ringAudioRef = useRef<any>(null);
 
-  // Initialize phone number from patient record
+  // Initialize phone number and load saved Twilio config
   useEffect(() => {
     if (appointment?.patient?.phone) {
       setPhoneNumber(appointment.patient.phone);
@@ -66,6 +80,17 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
     setCallState('IDLE');
     setCallTimer(0);
     setCallResult(null);
+    setTwilioError(null);
+    setTwilioDispatchedSuccess(false);
+
+    // Load Twilio config if present
+    api.getTelephonyConfig().then(cfg => {
+      if (cfg && cfg.is_configured) {
+        setIsTwilioConfigured(true);
+        setCallMode('twilio');
+        if (cfg.twilio_from) setTwilioFrom(cfg.twilio_from);
+      }
+    }).catch(() => {});
   }, [appointment, isOpen]);
 
   // Speech synthesis setup
@@ -78,6 +103,26 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, []);
+
+  const handleSaveTwilioConfig = async () => {
+    if (!twilioSid.trim() || !twilioToken.trim() || !twilioFrom.trim()) {
+      showToast('Please provide Account SID, Auth Token, and Twilio Number', 'error');
+      return;
+    }
+    try {
+      await api.saveTelephonyConfig({
+        twilio_sid: twilioSid,
+        twilio_token: twilioToken,
+        twilio_from: twilioFrom,
+      });
+      setIsTwilioConfigured(true);
+      setIsTwilioConfigOpen(false);
+      setCallMode('twilio');
+      showToast('✓ Twilio Cellular Gateway configured successfully!', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to save credentials', 'error');
+    }
+  };
 
   const speakIVR = (text: string, lang: 'en' | 'hi', onEnd?: () => void) => {
     if (!synthRef.current) {
@@ -115,6 +160,8 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
     if (!appointment) return;
     setCallState('RINGING');
     setCallTimer(0);
+    setTwilioError(null);
+    setTwilioDispatchedSuccess(false);
 
     try {
       const resp = await api.initiateOutboundCall({
@@ -122,23 +169,36 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
         phone_number: phoneNumber,
         mode: callMode,
         language: callLanguage,
+        twilio_sid: twilioSid || undefined,
+        twilio_token: twilioToken || undefined,
+        twilio_from: twilioFrom || undefined,
       });
 
       setCallSid(resp.call_sid);
       setActiveScript(resp.script);
 
-      // Ring for 3 seconds then connect
+      if (resp.twilio_error) {
+        setTwilioError(resp.twilio_error);
+      }
+
+      if (resp.twilio_dispatched) {
+        setTwilioDispatchedSuccess(true);
+        showToast(`📞 Outbound call dispatched to your mobile ${phoneNumber}!`, 'success');
+      }
+
+      // Connect call state
       setTimeout(() => {
         setCallState('IN_CALL');
         
-        // Start duration timer
         timerRef.current = setInterval(() => {
           setCallTimer(prev => prev + 1);
         }, 1000);
 
-        // Speak the professional IVR prompt out loud
-        speakIVR(resp.script, callLanguage);
-      }, 2500);
+        // Speak the professional IVR prompt in simulator/preview mode
+        if (callMode === 'simulator' || !resp.twilio_dispatched) {
+          speakIVR(resp.script, callLanguage);
+        }
+      }, 2000);
 
     } catch (err: any) {
       showToast(err.message || 'Failed to dispatch outbound call', 'error');
@@ -152,7 +212,6 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
     setIsProcessingKey(true);
     if (synthRef.current) synthRef.current.cancel();
 
-    // Play DTMF tone feedback
     playTone(digit === '1' ? 697 : 770);
 
     try {
@@ -161,14 +220,13 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
         phone_number: phoneNumber,
         digits_pressed: digit,
         duration_seconds: callTimer || 28,
-        notes: `Outbound AI Call: Patient selected Key [${digit}]`,
+        notes: `Outbound AI Call (${callMode}): Patient selected Key [${digit}]`,
       });
 
       setCallResult(result);
       setCallState('COMPLETED');
       clearInterval(timerRef.current);
 
-      // Speak confirmation feedback
       speakIVR(result.spoken_response, callLanguage);
 
       if (digit === '1') {
@@ -203,7 +261,6 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
     }
   };
 
-  // Simple Web Audio DTMF beep
   const playTone = (freq: number) => {
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
@@ -220,9 +277,7 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
         osc.start();
         osc.stop(ctx.currentTime + 0.25);
       }
-    } catch (e) {
-      // AudioContext unavailable
-    }
+    } catch (e) {}
   };
 
   const handleEndCall = () => {
@@ -245,19 +300,19 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-md">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md">
         <motion.div
           initial={{ opacity: 0, scale: 0.92, y: 20 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.92, y: 20 }}
           transition={{ type: 'spring', damping: 26, stiffness: 320 }}
-          className="w-full max-w-lg bg-[#121214] text-white rounded-3xl border border-white/[0.12] shadow-2xl overflow-hidden flex flex-col relative"
+          className="w-full max-w-lg bg-[#121214] text-white rounded-3xl border border-white/[0.12] shadow-2xl overflow-hidden flex flex-col relative max-h-[90vh] overflow-y-auto"
         >
           {/* Top Ambient Glow */}
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-80 h-36 bg-blue-500/10 blur-[80px] pointer-events-none rounded-full" />
+          <div className="absolute top-0 left-1/2 -translate-x-1/2 w-80 h-36 bg-blue-500/15 blur-[80px] pointer-events-none rounded-full" />
 
           {/* Header */}
-          <div className="pt-6 pb-4 px-6 border-b border-white/[0.08] flex items-center justify-between relative z-10">
+          <div className="pt-5 pb-3 px-6 border-b border-white/[0.08] flex items-center justify-between relative z-10">
             <div className="flex items-center gap-2.5">
               <div className="h-9 w-9 rounded-full bg-blue-500/15 border border-blue-500/30 flex items-center justify-center text-blue-400">
                 <PhoneForwarded className="h-4 w-4" />
@@ -267,27 +322,166 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
                   Outbound AI Confirmation Call
                 </h3>
                 <p className="text-[11px] text-white/50">
-                  IVR Touchtone Confirmation with Missed Visit Advisory
+                  IVR Touchtone Confirmation (Buttons 1 & 2)
                 </p>
               </div>
             </div>
 
-            <button
-              onClick={handleEndCall}
-              className="h-8 w-8 rounded-full bg-white/[0.06] hover:bg-white/[0.12] flex items-center justify-center text-white/60 hover:text-white transition-all"
-            >
-              <X className="h-4 w-4" />
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsTwilioConfigOpen(!isTwilioConfigOpen)}
+                className={`p-1.5 rounded-lg border text-xs flex items-center gap-1 transition-all ${
+                  isTwilioConfigured
+                    ? 'border-emerald-500/40 text-emerald-400 bg-emerald-500/10'
+                    : 'border-white/[0.1] text-white/60 hover:text-white bg-white/[0.05]'
+                }`}
+                title="Configure Real Cellular Phone Gateway (Twilio)"
+              >
+                <Settings className="h-3.5 w-3.5" />
+                <span className="text-[10px] hidden sm:inline">
+                  {isTwilioConfigured ? 'Twilio Active' : 'Configure Cellular'}
+                </span>
+              </button>
+
+              <button
+                onClick={handleEndCall}
+                className="h-8 w-8 rounded-full bg-white/[0.06] hover:bg-white/[0.12] flex items-center justify-center text-white/60 hover:text-white transition-all"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
           </div>
+
+          {/* Collapsible Twilio Gateway Setup Drawer */}
+          <AnimatePresence>
+            {isTwilioConfigOpen && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="bg-black/50 border-b border-white/[0.08] p-5 space-y-3 overflow-hidden text-xs"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 font-semibold text-white">
+                    <Signal className="h-4 w-4 text-emerald-400" />
+                    <span>Real Cellular Phone Calling Setup (Twilio Free Trial)</span>
+                  </div>
+                  <a
+                    href="https://www.twilio.com/try-twilio"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-[11px] text-blue-400 hover:underline flex items-center gap-1"
+                  >
+                    <span>Get Free $15.50 Credits</span>
+                    <ExternalLink className="h-3 w-3" />
+                  </a>
+                </div>
+
+                <p className="text-white/60 text-[11px] leading-relaxed">
+                  To ring your physical mobile phone over cellular networks, enter your free Twilio trial credentials below. Twilio provides 100% free credits upon signup with no card required:
+                </p>
+
+                <div className="grid grid-cols-1 gap-2.5 pt-1">
+                  <div>
+                    <label className="block text-[10px] text-white/50 mb-1 font-mono">TWILIO_ACCOUNT_SID (starts with AC...)</label>
+                    <input
+                      type="text"
+                      value={twilioSid}
+                      onChange={e => setTwilioSid(e.target.value)}
+                      placeholder="ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                      className="w-full bg-white/[0.06] border border-white/[0.1] rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-hidden focus:border-blue-500"
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-[10px] text-white/50 mb-1 font-mono">TWILIO_AUTH_TOKEN</label>
+                      <input
+                        type="password"
+                        value={twilioToken}
+                        onChange={e => setTwilioToken(e.target.value)}
+                        placeholder="••••••••••••••••••••••••••••••••"
+                        className="w-full bg-white/[0.06] border border-white/[0.1] rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-hidden focus:border-blue-500"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-white/50 mb-1 font-mono">TWILIO PHONE NUMBER (e.g. +1234567890)</label>
+                      <input
+                        type="text"
+                        value={twilioFrom}
+                        onChange={e => setTwilioFrom(e.target.value)}
+                        placeholder="+1 234 567 8900"
+                        className="w-full bg-white/[0.06] border border-white/[0.1] rounded-lg px-3 py-1.5 text-xs text-white font-mono focus:outline-hidden focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between pt-2">
+                  <span className="text-[10px] text-white/40">
+                    *Note: On free trial accounts, your mobile must be verified in Twilio Console Verified Caller IDs.
+                  </span>
+                  <button
+                    onClick={handleSaveTwilioConfig}
+                    className="px-4 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-xs transition-all shadow-sm"
+                  >
+                    Save & Enable Cellular
+                  </button>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
           {/* Modal Body */}
           <div className="p-6 space-y-5">
-            {/* 1. Phone Number Input & Target Appointment Info */}
+            {/* Call Mode Selector */}
+            <div className="flex items-center justify-between p-1 rounded-2xl bg-white/[0.04] border border-white/[0.08]">
+              <button
+                onClick={() => setCallMode('simulator')}
+                className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-semibold transition-all ${
+                  callMode === 'simulator'
+                    ? 'bg-white text-[#1D1D1F] shadow-sm'
+                    : 'text-white/60 hover:text-white'
+                }`}
+              >
+                Interactive Audio Call (100% Free Demo)
+              </button>
+              <button
+                onClick={() => {
+                  setCallMode('twilio');
+                  if (!isTwilioConfigured) {
+                    setIsTwilioConfigOpen(true);
+                  }
+                }}
+                className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
+                  callMode === 'twilio'
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-white/60 hover:text-white'
+                }`}
+              >
+                <Signal className="h-3 w-3" />
+                <span>Real Cellular Call (Twilio)</span>
+                {!isTwilioConfigured && (
+                  <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-300 font-mono">
+                    Setup
+                  </span>
+                )}
+              </button>
+            </div>
+
+            {/* Mobile Number Input */}
             <div className="space-y-3">
               <div>
-                <label className="block text-[11px] font-medium uppercase tracking-wider text-white/50 mb-1.5">
-                  Dial Mobile Number (Editable)
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="text-[11px] font-medium uppercase tracking-wider text-white/50">
+                    Destination Mobile Number (Type Your Own Mobile)
+                  </label>
+                  {callMode === 'twilio' && isTwilioConfigured && (
+                    <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
+                      Twilio Cellular Ready
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   <input
                     type="tel"
@@ -318,7 +512,7 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
                 </div>
               </div>
 
-              {/* Appointment & Missed Visits Card */}
+              {/* Appointment Context & Missed Visits Banner */}
               <div className="p-3.5 rounded-2xl bg-white/[0.04] border border-white/[0.08] flex items-start justify-between gap-3">
                 <div className="space-y-1">
                   <div className="text-xs font-semibold text-white">
@@ -335,20 +529,41 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
                   </div>
                 </div>
 
-                {/* Missed Visits Tag */}
+                {/* Missed Visits Alert Badge */}
                 {missedCount > 0 ? (
                   <div className="px-2.5 py-1 rounded-full bg-[#C9685B]/15 border border-[#C9685B]/30 text-[#C9685B] text-[10px] font-semibold flex items-center gap-1 whitespace-nowrap">
                     <AlertTriangle className="h-3 w-3" />
-                    <span>{missedCount} Missed Visit{missedCount > 1 ? 's' : ''}</span>
+                    <span>{missedCount} Previous Missed Visit{missedCount > 1 ? 's' : ''}</span>
                   </div>
                 ) : (
                   <div className="px-2.5 py-1 rounded-full bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-[10px] font-semibold flex items-center gap-1 whitespace-nowrap">
                     <ShieldCheck className="h-3 w-3" />
-                    <span>Good Attendance</span>
+                    <span>Clean History</span>
                   </div>
                 )}
               </div>
             </div>
+
+            {/* Twilio Dispatched Banner or Error */}
+            {twilioDispatchedSuccess && (
+              <div className="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2">
+                <PhoneCall className="h-4 w-4 animate-bounce shrink-0" />
+                <span>Real cellular call dialed to <strong>{phoneNumber}</strong>! Answer your phone to hear the IVR message.</span>
+              </div>
+            )}
+
+            {twilioError && (
+              <div className="p-3 rounded-xl bg-amber-500/15 border border-amber-500/30 text-amber-200 text-xs flex items-start gap-2">
+                <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <div className="font-semibold">Twilio Cellular Notice:</div>
+                  <p className="text-[11px] opacity-90">{twilioError}</p>
+                  <p className="text-[10px] text-amber-300/80">
+                    Tip: On free trial Twilio accounts, you must verify your number in Twilio Console → "Verified Caller IDs" before calling it. In the meantime, you can also use "Interactive Audio Call" mode!
+                  </p>
+                </div>
+              </div>
+            )}
 
             {/* 2. CALL STATE DISPLAY */}
 
@@ -357,13 +572,21 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
               <div className="pt-2">
                 <button
                   onClick={handleStartCall}
-                  className="w-full py-3 px-4 rounded-2xl bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm flex items-center justify-center gap-2 shadow-lg shadow-blue-600/30 active:scale-[0.98] transition-all"
+                  className={`w-full py-3.5 px-4 rounded-2xl font-bold text-sm flex items-center justify-center gap-2 shadow-lg active:scale-[0.98] transition-all ${
+                    callMode === 'twilio'
+                      ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-blue-600/30'
+                      : 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-emerald-600/30'
+                  }`}
                 >
                   <PhoneCall className="h-4 w-4" />
-                  <span>Initiate AI Phone Call to {phoneNumber}</span>
+                  <span>
+                    {callMode === 'twilio'
+                      ? `Ring My Physical Phone (${phoneNumber})`
+                      : `Initiate AI Confirmation Call to ${phoneNumber}`}
+                  </span>
                 </button>
                 <p className="text-[11px] text-center text-white/40 mt-2">
-                  Speaks professional clinical IVR notice & listens for Touchtone Key 1 or 2
+                  Speaks clinical missed visit advisory & enables Touchtone Confirmation (Buttons 1 & 2)
                 </p>
               </div>
             )}
@@ -378,8 +601,12 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
                   </div>
                 </div>
                 <div className="text-center">
-                  <div className="text-sm font-bold text-white">Ringing {phoneNumber}...</div>
-                  <div className="text-xs text-blue-400 mt-0.5">Connecting SlotSure IVR Gateway</div>
+                  <div className="text-sm font-bold text-white">
+                    {callMode === 'twilio' ? `Ringing Your Physical Mobile: ${phoneNumber}...` : `Dialing ${phoneNumber}...`}
+                  </div>
+                  <div className="text-xs text-blue-400 mt-0.5">
+                    {callMode === 'twilio' ? 'Twilio Cellular SIP Connected' : 'SlotSure IVR Gateway Connected'}
+                  </div>
                 </div>
               </div>
             )}
@@ -399,14 +626,14 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
                   </div>
                   <div className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
                     <Volume2 className="h-3 w-3 animate-pulse" />
-                    <span>IVR Speaking</span>
+                    <span>IVR Speaking Prompt</span>
                   </div>
                 </div>
 
                 {/* Spoken Script Box */}
                 <div className="p-3 rounded-xl bg-black/40 border border-white/[0.06] text-xs text-white/80 leading-relaxed max-h-24 overflow-y-auto">
                   <span className="text-[10px] uppercase tracking-wider text-blue-400 font-semibold block mb-1">
-                    Automated Voice Prompt:
+                    Automated Voice Prompt (Includes Missed Visits Notice):
                   </span>
                   <p className="italic">"{activeScript}"</p>
                 </div>
@@ -414,8 +641,10 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
                 {/* Touchtone Interactive Buttons (Key 1 & Key 2) */}
                 <div>
                   <div className="text-[11px] font-semibold uppercase tracking-wider text-white/50 mb-2 flex items-center justify-between">
-                    <span>Patient Touchtone Response:</span>
-                    <span className="text-emerald-400 font-sans normal-case">Click button or press 1 / 2</span>
+                    <span>Touchtone Response (Buttons 1 & 2):</span>
+                    <span className="text-emerald-400 font-sans normal-case text-xs">
+                      Press 1 on your phone or tap below
+                    </span>
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
@@ -423,7 +652,7 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
                     <button
                       onClick={() => handlePressKey('1')}
                       disabled={isProcessingKey}
-                      className="p-4 rounded-2xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-white flex flex-col items-center justify-center gap-1.5 active:scale-95 transition-all group shadow-md"
+                      className="p-4 rounded-2xl bg-emerald-600/20 hover:bg-emerald-600/30 border border-emerald-500/40 text-white flex flex-col items-center justify-center gap-1.5 active:scale-95 transition-all group shadow-md cursor-pointer"
                     >
                       <div className="h-10 w-10 rounded-full bg-emerald-600 text-white font-bold text-lg flex items-center justify-center shadow-md group-hover:scale-110 transition-all">
                         1
@@ -436,7 +665,7 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
                     <button
                       onClick={() => handlePressKey('2')}
                       disabled={isProcessingKey}
-                      className="p-4 rounded-2xl bg-[#C9685B]/20 hover:bg-[#C9685B]/30 border border-[#C9685B]/40 text-white flex flex-col items-center justify-center gap-1.5 active:scale-95 transition-all group shadow-md"
+                      className="p-4 rounded-2xl bg-[#C9685B]/20 hover:bg-[#C9685B]/30 border border-[#C9685B]/40 text-white flex flex-col items-center justify-center gap-1.5 active:scale-95 transition-all group shadow-md cursor-pointer"
                     >
                       <div className="h-10 w-10 rounded-full bg-[#C9685B] text-white font-bold text-lg flex items-center justify-center shadow-md group-hover:scale-110 transition-all">
                         2
@@ -494,7 +723,7 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
                     <span className="font-mono text-white/90">{callResult.phone_number}</span>
                   </div>
                   <div className="flex justify-between py-1 border-b border-white/[0.04]">
-                    <span className="text-white/60">DTMF Response:</span>
+                    <span className="text-white/60">Touchtone Response:</span>
                     <span className="font-bold text-white">
                       Key [{callResult.digits_pressed}] Registered
                     </span>
