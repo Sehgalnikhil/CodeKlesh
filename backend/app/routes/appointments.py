@@ -161,6 +161,7 @@ def update_appointment_status(
     confirmation_status: Optional[str] = None,
     sms_reminder_sent: Optional[bool] = None,
     recovery_status: Optional[str] = None,
+    notes: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     app = db.query(Appointment).options(
@@ -192,6 +193,8 @@ def update_appointment_status(
         app.sms_reminder_sent = sms_reminder_sent
     if recovery_status is not None:
         app.recovery_status = recovery_status
+    if notes is not None:
+        app.notes = notes
     
     db.commit()
     db.refresh(app)

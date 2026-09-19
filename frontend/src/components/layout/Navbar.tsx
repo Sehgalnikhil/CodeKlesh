@@ -8,7 +8,8 @@ import {
   CalendarPlus,
   UserPlus,
   Command,
-  X
+  X,
+  Smartphone
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -19,6 +20,7 @@ interface NavbarProps {
   onSelectDateFilter: (date: string) => void;
   currentDateFilter: string;
   onOpenSpotlight: () => void;
+  onOpenMobileSimulator?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -28,6 +30,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onSelectDateFilter,
   currentDateFilter,
   onOpenSpotlight,
+  onOpenMobileSimulator,
 }) => {
   const { user, darkMode, toggleDarkMode } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
@@ -105,6 +108,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             <CalendarPlus className="h-3.5 w-3.5" />
             <span>Book Appt</span>
           </button>
+
+          {/* Patient Mobile Simulator Trigger */}
+          {onOpenMobileSimulator && (
+            <button
+              onClick={onOpenMobileSimulator}
+              className="h-8 px-2.5 rounded-full border border-black/[0.08] dark:border-white/[0.1] bg-white/60 dark:bg-white/[0.05] hover:bg-black/[0.04] dark:hover:bg-white/[0.1] flex items-center gap-1.5 text-xs text-[#1D1D1F] dark:text-white transition-all active:scale-95 shadow-2xs"
+              title="Simulate Patient Smartphone Response"
+            >
+              <Smartphone className="h-3.5 w-3.5 text-[#4F8A70]" />
+              <span className="hidden xl:inline text-[11px] font-medium">Patient View</span>
+            </button>
+          )}
 
           <div className="h-4 w-[1px] bg-black/[0.08] dark:bg-white/[0.1] mx-0.5" />
 

@@ -21,6 +21,10 @@ import { AddPatientModal } from './components/modals/AddPatientModal';
 import { BookAppointmentModal } from './components/modals/BookAppointmentModal';
 import { Appointment, Patient, AnalyticsResponse } from './types';
 import { api } from './api/client';
+import { ActivityStreamProvider } from './context/ActivityStreamContext';
+import { ClinicLiveWire } from './components/ui/ClinicLiveWire';
+import { PatientMobileSimulator } from './components/modals/PatientMobileSimulator';
+import { ExecutiveROIReportModal } from './components/modals/ExecutiveROIReportModal';
 
 const MainAppContent: React.FC = () => {
   const { showToast } = useAuth();
@@ -36,6 +40,8 @@ const MainAppContent: React.FC = () => {
   const [bookPatientId, setBookPatientId] = useState<number | undefined>(undefined);
   const [isDemoModalOpen, setIsDemoModalOpen] = useState(false);
   const [isSpotlightOpen, setIsSpotlightOpen] = useState(false);
+  const [isMobileSimulatorOpen, setIsMobileSimulatorOpen] = useState(false);
+  const [isROIReportOpen, setIsROIReportOpen] = useState(false);
 
   // Data States
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -179,6 +185,7 @@ const MainAppContent: React.FC = () => {
           onSelectDateFilter={date => setCurrentDateFilter(date)}
           currentDateFilter={currentDateFilter}
           onOpenSpotlight={() => setIsSpotlightOpen(true)}
+          onOpenMobileSimulator={() => setIsMobileSimulatorOpen(true)}
         />
 
         {/* Dynamic Page Views */}
@@ -192,6 +199,7 @@ const MainAppContent: React.FC = () => {
               onNavigateToRecovery={() => setCurrentTab('recovery')}
               onOpenDemoModal={() => setIsDemoModalOpen(true)}
               onRefreshData={loadAllData}
+              onOpenROIReport={() => setIsROIReportOpen(true)}
             />
           )}
 
@@ -331,6 +339,24 @@ const MainAppContent: React.FC = () => {
         }}
       />
 
+      {/* Clinic LiveWire Real-Time Stream */}
+      <ClinicLiveWire />
+
+      {/* Patient Mobile Simulator */}
+      <PatientMobileSimulator
+        isOpen={isMobileSimulatorOpen}
+        onClose={() => setIsMobileSimulatorOpen(false)}
+        appointments={appointments}
+        onRefreshClinicData={loadAllData}
+      />
+
+      {/* Executive ROI & Capacity Operations Report */}
+      <ExecutiveROIReportModal
+        isOpen={isROIReportOpen}
+        onClose={() => setIsROIReportOpen(false)}
+        analytics={analytics}
+      />
+
       {/* Global Toast Container */}
       <ToastContainer />
     </div>
@@ -340,7 +366,9 @@ const MainAppContent: React.FC = () => {
 export default function App() {
   return (
     <AuthProvider>
-      <MainAppContent />
+      <ActivityStreamProvider>
+        <MainAppContent />
+      </ActivityStreamProvider>
     </AuthProvider>
   );
 }

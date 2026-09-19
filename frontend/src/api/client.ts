@@ -106,6 +106,7 @@ export const api = {
     confirmation_status?: string;
     sms_reminder_sent?: boolean;
     recovery_status?: string;
+    notes?: string;
   } | string, sms_reminder_sent?: boolean): Promise<Appointment> {
     const searchParams = new URLSearchParams();
     if (typeof params === 'string') {
@@ -116,6 +117,7 @@ export const api = {
       if (params.confirmation_status) searchParams.append('confirmation_status', params.confirmation_status);
       if (params.sms_reminder_sent !== undefined) searchParams.append('sms_reminder_sent', String(params.sms_reminder_sent));
       if (params.recovery_status) searchParams.append('recovery_status', params.recovery_status);
+      if (params.notes) searchParams.append('notes', params.notes);
     }
     return request(`/appointments/${id}?${searchParams.toString()}`, {
       method: 'PATCH',

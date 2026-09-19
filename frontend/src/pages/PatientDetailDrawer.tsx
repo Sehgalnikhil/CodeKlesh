@@ -21,6 +21,7 @@ import {
 import { Appointment } from '../types';
 import { RiskBadge } from '../components/ui/RiskBadge';
 import { useAuth } from '../context/AuthContext';
+import { useActivityStream } from '../context/ActivityStreamContext';
 import { api } from '../api/client';
 
 interface PatientDetailDrawerProps {
@@ -43,8 +44,11 @@ export const PatientDetailDrawer: React.FC<PatientDetailDrawerProps> = ({
   onRefreshData,
 }) => {
   const { showToast } = useAuth();
+  const { emitEvent } = useActivityStream();
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [isSendingReminder, setIsSendingReminder] = useState(false);
+  const [isQueuingCall, setIsQueuingCall] = useState(false);
+  const [callQueued, setCallQueued] = useState(false);
   const [reminderSentInfo, setReminderSentInfo] = useState<{ time: string; channel: string } | null>(null);
 
   if (!isOpen || !appointment) return null;
@@ -111,11 +115,45 @@ export const PatientDetailDrawer: React.FC<PatientDetailDrawerProps> = ({
       });
 
       showToast('✓ Reminder dispatched to patient via SMS + WhatsApp', 'success');
+      emitEvent({
+        type: 'REMINDER',
+        title: 'Clinical Reminder Dispatched',
+        description: `Dispatched SMS + WhatsApp reminder to ${patient?.first_name} ${patient?.last_name}`,
+        patientName: `${patient?.first_name} ${patient?.last_name}`,
+        doctorName: appointment.doctor_name,
+        badge: 'Dispatched',
+        badgeColor: '#647A8A',
+      });
       onRefreshData();
     } catch (err: any) {
       showToast(err.message || 'Failed to dispatch reminder', 'error');
     } finally {
       setIsSendingReminder(false);
+    }
+  };
+
+  const handleQueueStaffCall = async () => {
+    try {
+      setIsQueuingCall(true);
+      await api.updateAppointmentStatus(appointment.id, {
+        notes: (appointment.notes || '') + ' [Staff phone outreach queued]',
+      });
+      setCallQueued(true);
+      emitEvent({
+        type: 'CALL_QUEUED',
+        title: 'Staff Outreach Queued',
+        description: `Direct phone outreach task queued for ${patient?.first_name} ${patient?.last_name} on clinic desk`,
+        patientName: `${patient?.first_name} ${patient?.last_name}`,
+        doctorName: appointment.doctor_name,
+        badge: 'Call Queued',
+        badgeColor: '#C18A3A',
+      });
+      showToast(`✓ Clinical voice outreach queued for ${patient?.first_name} ${patient?.last_name}`, 'success');
+      onRefreshData();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to queue outreach', 'error');
+    } finally {
+      setIsQueuingCall(false);
     }
   };
 
@@ -386,6 +424,63 @@ export const PatientDetailDrawer: React.FC<PatientDetailDrawerProps> = ({
                 >
                   Dismiss
                 </button>
+              </div>
+            </div>
+
+            {/* Multi-Channel Outreach Escalation Cascade */}
+            <div className="p-5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.04] dark:border-white/[0.06] space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[#6B6B6F]">
+                  Outreach Escalation Cascade
+                </span>
+                <span className="text-[10px] font-mono text-[#647A8A]">
+                  Triage Protocol
+                </span>
+              </div>
+
+              <div className="space-y-2.5 text-xs">
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/70 dark:bg-black/30 border border-black/[0.04] dark:border-white/[0.06]">
+                  <div className="flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 text-[#4F8A70]" />
+                    <div>
+                      <span className="font-semibold text-[#1D1D1F] dark:text-white block">T-24h: Automated SMS</span>
+                      <span className="text-[10px] text-[#6B6B6F]">Deep-link confirmation sent</span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] text-[#4F8A70] font-semibold">Delivered</span>
+                </div>
+
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/70 dark:bg-black/30 border border-black/[0.04] dark:border-white/[0.06]">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-[#C18A3A]" />
+                    <div>
+                      <span className="font-semibold text-[#1D1D1F] dark:text-white block">T-18h: WhatsApp Interactive</span>
+                      <span className="text-[10px] text-[#6B6B6F]">Awaiting tap response</span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] text-[#C18A3A] font-semibold">Pending Reply</span>
+                </div>
+
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-white/70 dark:bg-black/30 border border-black/[0.04] dark:border-white/[0.06]">
+                  <div className="flex items-center gap-2">
+                    <PhoneCall className="h-4 w-4 text-[#647A8A]" />
+                    <div>
+                      <span className="font-semibold text-[#1D1D1F] dark:text-white block">T-8h: Priority Voice Outreach</span>
+                      <span className="text-[10px] text-[#6B6B6F]">Reception desk verbal triage</span>
+                    </div>
+                  </div>
+                  {callQueued ? (
+                    <span className="text-[10px] text-[#4F8A70] font-semibold">✓ Queued</span>
+                  ) : (
+                    <button
+                      disabled={isQueuingCall}
+                      onClick={handleQueueStaffCall}
+                      className="px-2.5 py-1 bg-[#1D1D1F] dark:bg-white text-white dark:text-[#1D1D1F] rounded-lg text-[10px] font-medium hover:bg-[#2C2C2E] transition-all disabled:opacity-50"
+                    >
+                      {isQueuingCall ? 'Queuing...' : 'Queue Call'}
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           </div>

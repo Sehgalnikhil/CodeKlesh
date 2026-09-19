@@ -25,6 +25,7 @@ import {
 import { SlotRecoveryItem, WaitlistEntry, Appointment } from '../types';
 import { api } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { useActivityStream } from '../context/ActivityStreamContext';
 import { RiskBadge } from '../components/ui/RiskBadge';
 
 interface SlotRecoveryPageProps {
@@ -33,11 +34,27 @@ interface SlotRecoveryPageProps {
 
 export const SlotRecoveryPage: React.FC<SlotRecoveryPageProps> = ({ onRefreshData }) => {
   const { showToast } = useAuth();
+  const { emitEvent } = useActivityStream();
   const [activeTab, setActiveTab] = useState<'RECOVERY_QUEUE' | 'WAITLIST'>('RECOVERY_QUEUE');
   const [recoveries, setRecoveries] = useState<SlotRecoveryItem[]>([]);
   const [waitlist, setWaitlist] = useState<WaitlistEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterAction, setFilterAction] = useState<string>('ALL');
+  const [tenderSeconds, setTenderSeconds] = useState(892);
+  const [tenderCandidateIndex, setTenderCandidateIndex] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setTenderSeconds(prev => (prev > 0 ? prev - 1 : 900));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatTimer = (sec: number) => {
+    const m = Math.floor(sec / 60);
+    const s = sec % 60;
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
 
   // Modals & confirmation sheets
   const [selectedRecoveryForWaitlist, setSelectedRecoveryForWaitlist] = useState<SlotRecoveryItem | null>(null);
@@ -276,6 +293,58 @@ export const SlotRecoveryPage: React.FC<SlotRecoveryPageProps> = ({ onRefreshDat
               </button>
             ))}
           </div>
+
+          {/* Autonomous Slot Backfill Countdown Tender */}
+          {activeAtRiskSlots.length > 0 && waitlist.filter(w => w.status === 'Waiting').length > 0 && (
+            (() => {
+              const waitingCandidates = waitlist.filter(w => w.status === 'Waiting');
+              const currentCandidate = waitingCandidates[tenderCandidateIndex % waitingCandidates.length];
+              const focalRecovery = activeAtRiskSlots[0];
+
+              return (
+                <div className="p-5 rounded-2xl bg-[#4F8A70]/10 border border-[#4F8A70]/20 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs">
+                  <div className="flex items-start gap-3">
+                    <div className="h-10 w-10 rounded-xl bg-[#4F8A70] text-white flex items-center justify-center font-bold flex-shrink-0 mt-0.5">
+                      <Clock className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-sm text-[#1D1D1F] dark:text-white">
+                          Smart Slot Tender: Backfill Active
+                        </span>
+                        <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#4F8A70] text-white animate-pulse">
+                          {formatTimer(tenderSeconds)} remaining
+                        </span>
+                      </div>
+                      <p className="text-[#6B6B6F] text-xs mt-1">
+                        Ephemeral offer dispatched to candidate <strong>{currentCandidate?.patient?.first_name} {currentCandidate?.patient?.last_name}</strong> for {focalRecovery?.appointment?.appointment_time} slot ({focalRecovery?.appointment?.doctor_name}).
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 self-start md:self-auto flex-shrink-0">
+                    <button
+                      onClick={() => {
+                        setTenderCandidateIndex(prev => prev + 1);
+                        setTenderSeconds(900);
+                        showToast(`✓ Cascaded offer to next waitlist candidate`, 'info');
+                      }}
+                      className="px-3.5 py-1.5 rounded-full border border-black/[0.08] dark:border-white/[0.1] text-xs font-medium text-[#1D1D1F] dark:text-white hover:bg-black/[0.03] dark:hover:bg-white/[0.05] transition-all"
+                    >
+                      Cascade to Next
+                    </button>
+                    <button
+                      onClick={() => handleExecuteWaitlistMatch(focalRecovery.id, currentCandidate.id)}
+                      className="px-4 py-1.5 rounded-full bg-[#4F8A70] hover:bg-[#3D6E58] text-white text-xs font-medium shadow-sm transition-all flex items-center gap-1.5"
+                    >
+                      <UserCheck className="h-3.5 w-3.5" />
+                      <span>Lock & Confirm Slot</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })()
+          )}
 
           {/* Slots Cards Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
