@@ -208,9 +208,11 @@ export const api = {
     conversation_history?: Array<{ role: string; content: string }>;
     pending_slot?: any;
     patient_id?: number;
+    preferred_language?: 'auto' | 'hi' | 'en';
   }): Promise<{
     ai_response: string;
     status: 'GREETING' | 'COLLECTING_INFO' | 'AWAITING_CONFIRMATION' | 'CONFIRMED';
+    language: 'hi' | 'en';
     pending_slot?: any;
     booked_appointment?: any;
   }> {

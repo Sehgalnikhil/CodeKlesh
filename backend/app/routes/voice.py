@@ -15,6 +15,7 @@ class VoiceDialogueRequest(BaseModel):
     conversation_history: Optional[List[Dict[str, str]]] = []
     pending_slot: Optional[Dict[str, Any]] = None
     patient_id: Optional[int] = None
+    preferred_language: Optional[str] = "auto" # "auto", "hi", "en"
 
 DOCTOR_SPECIALTY_MAP = {
     "Dr. Sharma": "Cardiology",
@@ -41,18 +42,43 @@ DEPARTMENT_DEFAULT_DOCTOR = {
 
 CONFIRMATION_KEYWORDS = [
     "yes", "confirm", "confirm it", "book it", "sure", "theek hai", "haan", "ha", 
-    "please do", "okay", "ok", "proceed", "go ahead", "lock it", "do it", "yep", "yeah", "definitely"
+    "please do", "okay", "ok", "proceed", "go ahead", "lock it", "do it", "yep", 
+    "yeah", "definitely", "kardo", "kar do", "theek", "pakka"
 ]
 
 CANCELLATION_KEYWORDS = [
-    "cancel", "stop", "reset", "start over", "no", "nah", "change", "wait"
+    "cancel", "stop", "reset", "start over", "no", "nah", "change", "wait", 
+    "nahi", "mat karo", "ruko", "badlo"
 ]
+
+HINDI_TRIGGER_WORDS = [
+    "namaste", "mujhe", "karna", "hai", "karo", "chahiye", "subah", "dopahar", 
+    "shaam", "kal", "aaj", "parso", "theek", "haan", "batao", "milna", "baje", 
+    "samay", "kripya", "dhanyawaad", "kijiye", "bataiye", "mein", "ka", "ki", 
+    "ke", "se", "nahi", "kardo", "hoga", "shukriya"
+]
+
+def detect_language(text: str, pref: Optional[str] = "auto", pending_lang: Optional[str] = None) -> str:
+    if pref and pref in ["hi", "en"]:
+        return pref
+    # Check Devanagari Unicode
+    if re.search(r'[\u0900-\u097F]', text):
+        return "hi"
+    # Clean punctuation and check words
+    text_clean = re.sub(r'[^\w\s]', ' ', text.lower())
+    words = set(text_clean.split())
+    for trigger in HINDI_TRIGGER_WORDS:
+        if trigger in words or trigger in text_clean:
+            return "hi"
+    if pending_lang:
+        return pending_lang
+    return "en"
 
 def parse_date_expression(text: str) -> str:
     text_lower = text.lower()
     today = date.today()
     
-    if "day after tomorrow" in text_lower:
+    if "day after tomorrow" in text_lower or "parso" in text_lower:
         return (today + timedelta(days=2)).isoformat()
     if "tomorrow" in text_lower or "kal" in text_lower:
         return (today + timedelta(days=1)).isoformat()
@@ -101,6 +127,8 @@ def parse_time_expression(text: str) -> str:
 def voice_ai_dialogue(req: VoiceDialogueRequest, db: Session = Depends(get_db)):
     speech = req.user_speech.strip()
     speech_lower = speech.lower()
+    pending_lang = req.pending_slot.get("language") if req.pending_slot else None
+    lang = detect_language(speech, req.preferred_language, pending_lang)
     
     # Get or default patient
     patient = None
@@ -115,9 +143,15 @@ def voice_ai_dialogue(req: VoiceDialogueRequest, db: Session = Depends(get_db)):
 
     # 1. Handle Cancellation / Reset
     if any(k in speech_lower for k in CANCELLATION_KEYWORDS) and not any(k in speech_lower for k in CONFIRMATION_KEYWORDS):
+        if lang == "hi":
+            cancel_msg = "Koi baat nahi, maine wah cancel kar diya hai. Aap kin doctor se milna chahte hain? Dr. Sharma ya Dr. Kapoor?"
+        else:
+            cancel_msg = "No problem, I have cancelled that request. Who would you like to see, or what medical department can I help you with?"
+            
         return {
-            "ai_response": "No problem, I have cancelled that request. Who would you like to see, or what medical department can I help you with?",
+            "ai_response": cancel_msg,
             "status": "COLLECTING_INFO",
+            "language": lang,
             "pending_slot": None,
             "booked_appointment": None
         }
@@ -146,7 +180,7 @@ def voice_ai_dialogue(req: VoiceDialogueRequest, db: Session = Depends(get_db)):
             days_in_advance=days_advance,
             status="Scheduled",
             confirmation_status="Confirmed",
-            notes=f"Booked via In-Browser AI Phone Agent for {patient.first_name} {patient.last_name}"
+            notes=f"Booked via Voice AI ({lang.upper()}) for {patient.first_name} {patient.last_name}"
         )
         db.add(appointment)
         db.flush()
@@ -184,15 +218,26 @@ def voice_ai_dialogue(req: VoiceDialogueRequest, db: Session = Depends(get_db)):
         db.refresh(appointment)
 
         readable_date = datetime.strptime(appointment.appointment_date, "%Y-%m-%d").strftime("%A, %B %d")
-        response_text = (
-            f"Wonderful! Your appointment with {appointment.doctor_name} in {appointment.department} "
-            f"for {readable_date} at {appointment.appointment_time} is now confirmed. "
-            f"Your appointment reference is number {appointment.id}. "
-            f"A confirmation has been sent to your registered mobile. Have a great day!"
-        )
+        
+        if lang == "hi":
+            response_text = (
+                f"Bahut badhiya! {patient.first_name} ka appointment {appointment.doctor_name} ke sath "
+                f"{appointment.department} mein {readable_date} ko {appointment.appointment_time} baje confirm ho gaya hai. "
+                f"Aapka booking reference number {appointment.id} hai. "
+                f"Aapke mobile par confirmation bhej diya gaya hai. Dhanyawaad!"
+            )
+        else:
+            response_text = (
+                f"Wonderful! Your appointment with {appointment.doctor_name} in {appointment.department} "
+                f"for {readable_date} at {appointment.appointment_time} is now confirmed. "
+                f"Your appointment reference is number {appointment.id}. "
+                f"A confirmation has been sent to your registered mobile. Have a great day!"
+            )
+
         return {
             "ai_response": response_text,
             "status": "CONFIRMED",
+            "language": lang,
             "pending_slot": None,
             "booked_appointment": {
                 "id": appointment.id,
@@ -244,29 +289,48 @@ def voice_ai_dialogue(req: VoiceDialogueRequest, db: Session = Depends(get_db)):
             "appointment_date": extracted_date,
             "appointment_time": extracted_time,
             "patient_id": patient.id,
-            "patient_name": f"{patient.first_name} {patient.last_name}"
+            "patient_name": f"{patient.first_name} {patient.last_name}",
+            "language": lang
         }
         
-        reply = (
-            f"I found an open slot at {extracted_time} on {readable_date} "
-            f"with {extracted_doctor} in {extracted_dept}. "
-            f"Would you like me to confirm this booking for {patient.first_name}?"
-        )
+        if lang == "hi":
+            reply = (
+                f"Maine {readable_date} ko {extracted_time} baje {extracted_doctor} ke sath "
+                f"{extracted_dept} mein aapka slot check kiya hai. "
+                f"Kya main {patient.first_name} ke liye ise book kar doon?"
+            )
+        else:
+            reply = (
+                f"I found an open slot at {extracted_time} on {readable_date} "
+                f"with {extracted_doctor} in {extracted_dept}. "
+                f"Would you like me to confirm this booking for {patient.first_name}?"
+            )
+
         return {
             "ai_response": reply,
             "status": "AWAITING_CONFIRMATION",
+            "language": lang,
             "pending_slot": slot,
             "booked_appointment": None
         }
 
     # 6. Fallback inquiry if insufficient parameters
-    return {
-        "ai_response": (
+    if lang == "hi":
+        fallback_msg = (
+            "Namaste! Main SlotSure Clinic AI reception hoon. Main aapka appointment abhi schedule kar sakti hoon. "
+            "Aap kin doctor se milna chahte hain? Jaise ki Cardiology mein Dr. Sharma, ya Pediatrics mein Dr. Kapoor?"
+        )
+    else:
+        fallback_msg = (
             "Namaste! This is SlotSure Clinic AI. I can schedule your visit right now. "
             "Which doctor or department would you like to visit? For example, Dr. Sharma in Cardiology, "
             "Dr. Kapoor in Pediatrics, or Dr. Verma in General Medicine?"
-        ),
+        )
+
+    return {
+        "ai_response": fallback_msg,
         "status": "COLLECTING_INFO",
+        "language": lang,
         "pending_slot": None,
         "booked_appointment": None
     }
