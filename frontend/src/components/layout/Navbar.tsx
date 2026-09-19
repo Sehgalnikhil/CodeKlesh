@@ -63,8 +63,16 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
 
-        {/* Right Controls: Date, Book Appointment, Appearance, Notifications */}
+        {/* Right Controls: Real-Time Sync, Date, Book Appointment, Appearance, Notifications */}
         <div className="flex items-center gap-2.5 sm:gap-3">
+          {/* Real-time live status beacon */}
+          <div className="hidden lg:flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 dark:text-emerald-400 text-[11px] font-semibold select-none">
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+            </span>
+            <span className="tracking-tight">Live ML Sync</span>
+          </div>
           {/* Apple Date Segmented Pill */}
           <div className="hidden md:flex items-center p-0.5 bg-black/[0.03] dark:bg-white/[0.05] rounded-full border border-black/[0.04] dark:border-white/[0.06]">
             <button

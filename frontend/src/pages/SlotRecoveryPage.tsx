@@ -104,7 +104,23 @@ export const SlotRecoveryPage: React.FC<SlotRecoveryPageProps> = ({ onRefreshDat
     }
   };
 
+  const [selectedRecoveryId, setSelectedRecoveryId] = useState<number | null>(null);
+
   const activeAtRiskSlots = recoveries.filter(r => r.status === 'Proposed');
+
+  const activeSlot =
+    (selectedRecoveryId ? recoveries.find(r => r.id === selectedRecoveryId) : null) ||
+    activeAtRiskSlots[0] ||
+    recoveries[0];
+
+  const activeApp = activeSlot?.appointment;
+  const activePat = activeApp?.patient;
+  const activeProb = Math.round((activeSlot?.risk_probability || 0.85) * 100);
+  const activeCandidate =
+    activeSlot?.candidate_waitlist ||
+    waitlist.find(w => w.department === activeApp?.department) ||
+    waitlist[0];
+  const activeProtected = activeSlot?.revenue_protected || activeApp?.estimated_slot_value || 2500;
 
   const filteredSlots = recoveries.filter(r => {
     if (filterAction === 'ALL') return true;
@@ -118,7 +134,7 @@ export const SlotRecoveryPage: React.FC<SlotRecoveryPageProps> = ({ onRefreshDat
       <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4">
         <div>
           <span className="text-[11px] font-extrabold uppercase tracking-widest text-rose-600 dark:text-rose-400">
-            SLOT RECOVERY
+            SLOT RECOVERY ENGINE
           </span>
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[#1D1D1F] dark:text-[#F5F5F7] mt-1">
             {activeAtRiskSlots.length || 11} appointment slots need attention.
@@ -131,18 +147,24 @@ export const SlotRecoveryPage: React.FC<SlotRecoveryPageProps> = ({ onRefreshDat
         <div className="flex items-center gap-3">
           <button
             onClick={loadData}
-            className="p-2.5 rounded-full border border-black/[0.06] dark:border-white/[0.08] bg-white/80 dark:bg-white/[0.05] hover:bg-black/[0.04] dark:hover:bg-white/[0.1] text-zinc-600 dark:text-zinc-300 transition-all shadow-sm active:scale-95"
+            className="p-2.5 rounded-full border border-black/[0.06] dark:border-white/[0.08] bg-white/80 dark:bg-white/[0.05] hover:bg-black/[0.04] dark:hover:bg-white/[0.1] text-zinc-600 dark:text-zinc-300 transition-all shadow-sm active:scale-95 flex items-center gap-1.5 text-xs font-semibold"
             title="Refresh recovery queue"
           >
-            <RefreshCw className="h-4 w-4" />
+            <RefreshCw className="h-3.5 w-3.5" />
+            <span className="hidden sm:inline">Sync Queue</span>
           </button>
         </div>
       </div>
 
       {/* Visual Connection Flow: At-risk appointment → AI decision → Waitlist match → Recovered slot */}
       <div className="p-6 rounded-3xl apple-card relative overflow-hidden">
-        <div className="text-[10px] font-bold uppercase tracking-wider text-[#6E6E73] mb-4">
-          Autonomous Recovery Architecture
+        <div className="flex items-center justify-between mb-4">
+          <div className="text-[10px] font-bold uppercase tracking-wider text-[#6E6E73]">
+            Live Autonomous Recovery Architecture (Active Pipeline Flow)
+          </div>
+          <span className="text-[10px] font-semibold text-brand-600 dark:text-brand-400">
+            Click any slot below to inspect
+          </span>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 relative">
@@ -151,11 +173,11 @@ export const SlotRecoveryPage: React.FC<SlotRecoveryPageProps> = ({ onRefreshDat
             <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase tracking-wide block">
               1. At-Risk Slot
             </span>
-            <div className="font-extrabold text-[#1D1D1F] dark:text-white mt-1 text-sm">
-              10:30 AM · Aarav Mehta
+            <div className="font-extrabold text-[#1D1D1F] dark:text-white mt-1 text-sm truncate">
+              {activeApp?.appointment_time || '10:30 AM'} · {activePat ? `${activePat.first_name} ${activePat.last_name}` : 'Aarav Mehta'}
             </div>
-            <p className="text-[11px] text-[#6E6E73] mt-1">
-              87% no-show probability · Unconfirmed
+            <p className="text-[11px] text-[#6E6E73] mt-1 truncate">
+              {activeProb}% no-show risk · {activeApp?.confirmation_status || 'Unconfirmed'}
             </p>
           </div>
 
@@ -164,11 +186,11 @@ export const SlotRecoveryPage: React.FC<SlotRecoveryPageProps> = ({ onRefreshDat
             <span className="text-[10px] font-bold text-brand-600 dark:text-brand-400 uppercase tracking-wide block">
               2. AI Decision
             </span>
-            <div className="font-extrabold text-[#1D1D1F] dark:text-white mt-1 text-sm">
-              Waitlist Backfill
+            <div className="font-extrabold text-[#1D1D1F] dark:text-white mt-1 text-sm truncate">
+              {activeSlot?.action_type === 'WAITLIST' ? 'Waitlist Backfill' : activeSlot?.action_type === 'DOUBLE_BOOK' ? 'Controlled Double-Book' : 'Capacity Protection'}
             </div>
-            <p className="text-[11px] text-[#6E6E73] mt-1">
-              Triggered after 24h confirmation timeout
+            <p className="text-[11px] text-[#6E6E73] mt-1 truncate">
+              {activeSlot?.reasoning ? activeSlot.reasoning : 'Triggered after 24h confirmation timeout'}
             </p>
           </div>
 
@@ -177,11 +199,11 @@ export const SlotRecoveryPage: React.FC<SlotRecoveryPageProps> = ({ onRefreshDat
             <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-wide block">
               3. Waitlist Match
             </span>
-            <div className="font-extrabold text-[#1D1D1F] dark:text-white mt-1 text-sm">
-              Priya Kapoor (Urgent)
+            <div className="font-extrabold text-[#1D1D1F] dark:text-white mt-1 text-sm truncate">
+              {activeCandidate?.patient ? `${activeCandidate.patient.first_name} ${activeCandidate.patient.last_name}` : 'Priya Kapoor'} ({activeCandidate?.priority || 'Urgent'})
             </div>
-            <p className="text-[11px] text-[#6E6E73] mt-1">
-              Cardiology · Matches doctor & time
+            <p className="text-[11px] text-[#6E6E73] mt-1 truncate">
+              {activeCandidate?.department || activeApp?.department || 'General Medicine'} · Matches doctor & time
             </p>
           </div>
 
@@ -191,10 +213,10 @@ export const SlotRecoveryPage: React.FC<SlotRecoveryPageProps> = ({ onRefreshDat
               4. Recovered Slot
             </span>
             <div className="font-extrabold text-emerald-700 dark:text-emerald-300 mt-1 text-sm">
-              ₹2,500 Protected
+              ₹{activeProtected.toLocaleString('en-IN')} Protected
             </div>
             <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1">
-              100% capacity preserved
+              {activeSlot?.status === 'Executed' ? 'Capacity fully restored' : '100% capacity preserved'}
             </p>
           </div>
         </div>
@@ -234,11 +256,17 @@ export const SlotRecoveryPage: React.FC<SlotRecoveryPageProps> = ({ onRefreshDat
 
           // Candidate match for waitlist
           const matchingCandidate = waitlist.find(w => w.department === app?.department) || waitlist[0];
+          const isSelected = activeSlot?.id === item.id;
 
           return (
             <div
               key={item.id}
-              className={`p-6 sm:p-7 rounded-3xl apple-card flex flex-col justify-between ${
+              onClick={() => setSelectedRecoveryId(item.id)}
+              className={`p-6 sm:p-7 rounded-3xl apple-card flex flex-col justify-between cursor-pointer transition-all ${
+                isSelected
+                  ? 'ring-2 ring-brand-500/60 shadow-lg'
+                  : ''
+              } ${
                 isExecuted
                   ? 'border-emerald-500/40 opacity-90'
                   : item.risk_probability >= 0.8
@@ -259,6 +287,11 @@ export const SlotRecoveryPage: React.FC<SlotRecoveryPageProps> = ({ onRefreshDat
                     <p className="text-xs text-[#6E6E73] mt-0.5 font-medium">
                       {app?.doctor_name} · {app?.department}
                     </p>
+                    {isSelected && (
+                      <span className="inline-block mt-1 text-[9px] font-bold px-2 py-0.5 rounded-full bg-brand-500/15 text-brand-600 dark:text-brand-300">
+                        Inspecting in Pipeline Flow
+                      </span>
+                    )}
                   </div>
 
                   <div className="text-right">

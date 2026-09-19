@@ -78,6 +78,33 @@ const MainAppContent: React.FC = () => {
     loadAllData();
   }, [appointmentTab, currentDateFilter, searchQuery]);
 
+  // Real-time live synchronization (every 5 seconds in background)
+  useEffect(() => {
+    const liveSyncInterval = setInterval(async () => {
+      try {
+        const [apptsData, analyticsData] = await Promise.all([
+          api.getAppointments({
+            tab: appointmentTab,
+            date_filter: currentDateFilter,
+            search: searchQuery,
+          }),
+          api.getAnalytics(),
+        ]);
+        setAppointments(apptsData);
+        setAnalytics(analyticsData);
+
+        if (selectedAppointment) {
+          const updated = apptsData.find(a => a.id === selectedAppointment.id);
+          if (updated) setSelectedAppointment(updated);
+        }
+      } catch (err) {
+        // silent background fail on brief network blips
+      }
+    }, 5000);
+
+    return () => clearInterval(liveSyncInterval);
+  }, [appointmentTab, currentDateFilter, searchQuery, selectedAppointment]);
+
   // Global ⌘K Spotlight shortcut
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
