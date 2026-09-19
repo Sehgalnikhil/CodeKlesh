@@ -201,4 +201,22 @@ export const api = {
   async getModelMetrics(): Promise<ModelMetricsResponse> {
     return request('/model/metrics');
   },
+
+  // Voice AI Dialogue
+  async voiceDialogue(payload: {
+    user_speech: string;
+    conversation_history?: Array<{ role: string; content: string }>;
+    pending_slot?: any;
+    patient_id?: number;
+  }): Promise<{
+    ai_response: string;
+    status: 'GREETING' | 'COLLECTING_INFO' | 'AWAITING_CONFIRMATION' | 'CONFIRMED';
+    pending_slot?: any;
+    booked_appointment?: any;
+  }> {
+    return request('/voice/ai-dialogue', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
 };

@@ -2,7 +2,7 @@ import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .database import engine, Base
-from .routes import auth, patients, appointments, predict, reminders, analytics, models_info, waitlist, slot_recovery
+from .routes import auth, patients, appointments, predict, reminders, analytics, models_info, waitlist, slot_recovery, voice
 
 # Initialize database tables
 Base.metadata.create_all(bind=engine)
@@ -32,6 +32,7 @@ app.include_router(waitlist.router)
 app.include_router(slot_recovery.router)
 app.include_router(analytics.router)
 app.include_router(models_info.router)
+app.include_router(voice.router)
 
 @app.get("/")
 def root():

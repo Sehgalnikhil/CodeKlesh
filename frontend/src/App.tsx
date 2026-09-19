@@ -25,6 +25,7 @@ import { ActivityStreamProvider } from './context/ActivityStreamContext';
 import { ClinicLiveWire } from './components/ui/ClinicLiveWire';
 import { PatientMobileSimulator } from './components/modals/PatientMobileSimulator';
 import { ExecutiveROIReportModal } from './components/modals/ExecutiveROIReportModal';
+import { AIVoiceCallingModal } from './components/modals/AIVoiceCallingModal';
 
 const MainAppContent: React.FC = () => {
   const { showToast } = useAuth();
@@ -42,6 +43,7 @@ const MainAppContent: React.FC = () => {
   const [isSpotlightOpen, setIsSpotlightOpen] = useState(false);
   const [isMobileSimulatorOpen, setIsMobileSimulatorOpen] = useState(false);
   const [isROIReportOpen, setIsROIReportOpen] = useState(false);
+  const [isVoiceCallOpen, setIsVoiceCallOpen] = useState(false);
 
   // Data States
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -186,6 +188,7 @@ const MainAppContent: React.FC = () => {
           currentDateFilter={currentDateFilter}
           onOpenSpotlight={() => setIsSpotlightOpen(true)}
           onOpenMobileSimulator={() => setIsMobileSimulatorOpen(true)}
+          onOpenVoiceCall={() => setIsVoiceCallOpen(true)}
         />
 
         {/* Dynamic Page Views */}
@@ -355,6 +358,13 @@ const MainAppContent: React.FC = () => {
         isOpen={isROIReportOpen}
         onClose={() => setIsROIReportOpen(false)}
         analytics={analytics}
+      />
+
+      {/* AI Voice Calling Desk Modal */}
+      <AIVoiceCallingModal
+        isOpen={isVoiceCallOpen}
+        onClose={() => setIsVoiceCallOpen(false)}
+        onAppointmentBooked={loadAllData}
       />
 
       {/* Global Toast Container */}

@@ -8,7 +8,8 @@ import {
   UserPlus,
   Command,
   X,
-  Smartphone
+  Smartphone,
+  PhoneCall
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -20,6 +21,7 @@ interface NavbarProps {
   currentDateFilter: string;
   onOpenSpotlight: () => void;
   onOpenMobileSimulator?: () => void;
+  onOpenVoiceCall?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -30,6 +32,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   currentDateFilter,
   onOpenSpotlight,
   onOpenMobileSimulator,
+  onOpenVoiceCall,
 }) => {
   const { user, darkMode, toggleDarkMode } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
@@ -98,6 +101,18 @@ export const Navbar: React.FC<NavbarProps> = ({
               Today · {formattedToday}
             </button>
           </div>
+
+          {/* AI Voice Calling Desk Trigger */}
+          {onOpenVoiceCall && (
+            <button
+              onClick={onOpenVoiceCall}
+              className="h-8 px-3 rounded-full bg-emerald-500/10 hover:bg-emerald-500/15 border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 flex items-center gap-1.5 text-xs font-semibold transition-all active:scale-95 shadow-2xs"
+              title="Call Clinic AI Voice Booking Desk"
+            >
+              <PhoneCall className="h-3.5 w-3.5" />
+              <span className="text-[11px]">AI Voice Desk</span>
+            </button>
+          )}
 
           {/* Patient Mobile Simulator Trigger */}
           {onOpenMobileSimulator && (
