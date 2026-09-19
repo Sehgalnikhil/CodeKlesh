@@ -5,7 +5,6 @@ import {
   Calendar,
   Moon,
   Sun,
-  CalendarPlus,
   UserPlus,
   Command,
   X,
@@ -16,7 +15,7 @@ import { useAuth } from '../../context/AuthContext';
 interface NavbarProps {
   onSearch: (q: string) => void;
   onOpenAddPatient: () => void;
-  onOpenBookAppointment: () => void;
+  onOpenBookAppointment?: () => void;
   onSelectDateFilter: (date: string) => void;
   currentDateFilter: string;
   onOpenSpotlight: () => void;
@@ -99,15 +98,6 @@ export const Navbar: React.FC<NavbarProps> = ({
               Today · {formattedToday}
             </button>
           </div>
-
-          {/* Quick action: Book Appointment */}
-          <button
-            onClick={onOpenBookAppointment}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#1D1D1F] hover:bg-[#2C2C2E] dark:bg-white dark:hover:bg-[#E5E5EA] text-xs font-medium text-white dark:text-[#1D1D1F] rounded-full shadow-sm active:scale-95 transition-all"
-          >
-            <CalendarPlus className="h-3.5 w-3.5" />
-            <span>Book Appt</span>
-          </button>
 
           {/* Patient Mobile Simulator Trigger */}
           {onOpenMobileSimulator && (
