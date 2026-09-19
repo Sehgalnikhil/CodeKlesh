@@ -287,6 +287,117 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
     }
   };
 
+  // Manual End Call by user / doctor
+  const handleManualEndCall = async () => {
+    if (synthRef.current) synthRef.current.cancel();
+    if (timerRef.current) clearInterval(timerRef.current);
+
+    const isConfirmed = appointment?.confirmation_status === 'Confirmed';
+    const isCancelled = appointment?.confirmation_status === 'Cancelled';
+
+    setCallResult({
+      success: true,
+      outcome: isConfirmed ? 'CONFIRMED' : isCancelled ? 'CANCELLED_FREED' : 'NO_RESPONSE',
+      outcome_label: isConfirmed
+        ? 'Attendance Confirmed (Key 1)'
+        : isCancelled
+        ? 'Appointment Cancelled (Key 2)'
+        : 'Call Concluded',
+      spoken_response: isConfirmed
+        ? 'Slot attendance confirmed and secured.'
+        : isCancelled
+        ? 'Slot released to queue for standby patients.'
+        : 'Call concluded and logged in patient clinical history.',
+      appointment_id: appointment?.id || 0,
+      patient_name: `${appointment?.patient?.first_name || 'Patient'} ${appointment?.patient?.last_name || ''}`,
+      doctor_name: appointment?.doctor_name || '',
+      department: appointment?.department || '',
+      confirmation_status: appointment?.confirmation_status || 'Unconfirmed',
+      recovery_status: appointment?.recovery_status || 'Normal',
+      phone_number: phoneNumber,
+      digits_pressed: isConfirmed ? '1' : isCancelled ? '2' : 'None',
+      duration_seconds: callTimer || 10,
+      capacity_action: isConfirmed ? 'Slot Protected' : isCancelled ? 'Recovery Queued' : 'Logged in Audit History',
+      revenue_protected: 120,
+      timestamp: new Date().toLocaleTimeString(),
+    });
+
+    setCallState('COMPLETED');
+    showToast('✓ Call ended and audit report recorded.', 'info');
+    onRefreshData();
+  };
+
+  // Real-time polling for physical cellular call completion and DTMF keypresses
+  useEffect(() => {
+    if (callState !== 'IN_CALL' || !appointment?.id) {
+      return;
+    }
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const status = await api.getCallStatus(appointment.id, callSid || undefined);
+        if (status && status.is_completed) {
+          clearInterval(pollInterval);
+          if (timerRef.current) clearInterval(timerRef.current);
+
+          const isConfirm = status.digits_pressed === '1' || status.confirmation_status === 'Confirmed';
+          const isCancel = status.digits_pressed === '2' || status.confirmation_status === 'Cancelled';
+
+          let outcomeLabel = 'Physical Mobile Call Ended';
+          let spokenResp = 'Call completed on physical cellular phone.';
+          let capAction = 'Logged in Clinical Audit History';
+          let outcomeType: 'CONFIRMED' | 'CANCELLED_FREED' | 'NO_RESPONSE' = 'NO_RESPONSE';
+
+          if (isConfirm) {
+            outcomeLabel = 'Attendance Confirmed via Physical Mobile Phone (Key 1)';
+            spokenResp = 'Patient pressed 1: Confirmed attendance & secured reserved slot';
+            capAction = 'Slot Protected & Locked';
+            outcomeType = 'CONFIRMED';
+          } else if (isCancel) {
+            outcomeLabel = 'Appointment Cancelled via Physical Mobile Phone (Key 2)';
+            spokenResp = 'Patient pressed 2: Released slot for urgent standby patients';
+            capAction = 'Immediate Slot Recovery Triggered';
+            outcomeType = 'CANCELLED_FREED';
+          }
+
+          setCallResult({
+            success: true,
+            outcome: outcomeType,
+            outcome_label: outcomeLabel,
+            spoken_response: spokenResp,
+            appointment_id: appointment.id,
+            patient_name: `${appointment.patient?.first_name || 'Patient'} ${appointment.patient?.last_name || ''}`,
+            doctor_name: appointment.doctor_name,
+            department: appointment.department,
+            confirmation_status: status.confirmation_status,
+            recovery_status: status.recovery_status,
+            phone_number: phoneNumber,
+            digits_pressed: status.digits_pressed || (isConfirm ? '1' : isCancel ? '2' : 'None'),
+            duration_seconds: status.duration_seconds || callTimer || 15,
+            capacity_action: capAction,
+            revenue_protected: 120,
+            timestamp: new Date().toLocaleTimeString(),
+          });
+
+          setCallState('COMPLETED');
+          showToast(
+            isConfirm
+              ? '✓ Cellular Call Confirmed via Phone Key 1!'
+              : isCancel
+              ? '✓ Cellular Call Cancelled via Phone Key 2'
+              : '✓ Call ended on physical mobile phone',
+            'success'
+          );
+          onRefreshData();
+        }
+      } catch (err) {
+        // Silent catch for poll intervals
+      }
+    }, 1500);
+
+    return () => clearInterval(pollInterval);
+  }, [callState, appointment?.id, callSid, callTimer]);
+
   const playTone = (freq: number) => {
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
@@ -706,6 +817,15 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
                       <span className="text-[10px] text-white/60">Release Slot to Queue</span>
                     </button>
                   </div>
+
+                  {/* Manual End Call / Hang Up Button */}
+                  <button
+                    onClick={handleManualEndCall}
+                    className="w-full mt-3 py-2.5 px-4 rounded-xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-300 text-xs font-semibold flex items-center justify-center gap-2 transition-all cursor-pointer shadow-sm"
+                  >
+                    <PhoneOff className="h-3.5 w-3.5" />
+                    <span>Call Ended on Mobile / Hang Up (View Report)</span>
+                  </button>
                 </div>
               </div>
             )}

@@ -381,6 +381,9 @@ def get_telephony_config():
         "twilio_from": phone
     }
 
+# Live Call Sessions Registry to track real-time cellular status & DTMF completion
+ACTIVE_CALL_SESSIONS: Dict[str, Dict[str, Any]] = {}
+
 def get_public_base_url() -> Optional[str]:
     import os
     env_url = os.getenv("PUBLIC_WEBHOOK_URL")
@@ -467,7 +470,9 @@ async def twiml_action_endpoint(appointment_id: int, request: Request, db: Sessi
         return Response(content='<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice" language="en-IN">Appointment not found. Goodbye.</Say></Response>', media_type="application/xml")
 
     from ..models import SlotRecovery
+    outcome_str = "COMPLETED_NO_KEY"
     if digits == "1":
+        outcome_str = "CONFIRMED"
         app.confirmation_status = "Confirmed"
         app.recovery_status = "Normal"
         app.notes = (app.notes or "") + f" [Twilio Phone DTMF Key 1: Confirmed via Phone Call {call_sid}]"
@@ -480,6 +485,7 @@ async def twiml_action_endpoint(appointment_id: int, request: Request, db: Sessi
     <Say voice="alice" language="en-IN">Thank you! Your attendance has been confirmed on SlotSure. Your reserved slot is fully secured. Have a wonderful day. Goodbye.</Say>
 </Response>"""
     elif digits == "2":
+        outcome_str = "CANCELLED"
         app.confirmation_status = "Cancelled"
         app.recovery_status = "Action Required"
         app.notes = (app.notes or "") + f" [Twilio Phone DTMF Key 2: Cancelled via Phone Call {call_sid}]"
@@ -505,7 +511,95 @@ async def twiml_action_endpoint(appointment_id: int, request: Request, db: Sessi
     <Say voice="alice" language="en-IN">Thank you for contacting SlotSure Healthcare. Goodbye.</Say>
 </Response>"""
 
+    # Record in active sessions
+    if call_sid:
+        session = ACTIVE_CALL_SESSIONS.get(call_sid) or {}
+        session.update({
+            "call_sid": call_sid,
+            "appointment_id": appointment_id,
+            "status": "COMPLETED",
+            "digits_pressed": digits,
+            "outcome": outcome_str
+        })
+        ACTIVE_CALL_SESSIONS[call_sid] = session
+
     return Response(content=reply_xml, media_type="application/xml")
+
+@router.api_route("/twiml-status/{appointment_id}", methods=["GET", "POST"])
+async def twiml_status_endpoint(appointment_id: int, request: Request, db: Session = Depends(get_db)):
+    form_data = await request.form()
+    call_sid = form_data.get("CallSid", "")
+    call_status = form_data.get("CallStatus", "")
+    duration = form_data.get("CallDuration", "0")
+    
+    if call_sid:
+        session = ACTIVE_CALL_SESSIONS.get(call_sid) or {}
+        session["call_sid"] = call_sid
+        session["appointment_id"] = appointment_id
+        session["call_status"] = call_status
+        if call_status in ["completed", "busy", "no-answer", "canceled", "failed"]:
+            session["status"] = "COMPLETED"
+        if duration and duration.isdigit():
+            session["duration_seconds"] = int(duration)
+        ACTIVE_CALL_SESSIONS[call_sid] = session
+    return Response(content="<Response/>", media_type="application/xml")
+
+@router.get("/call-status/{appointment_id}")
+def get_call_status(appointment_id: int, call_sid: Optional[str] = None, db: Session = Depends(get_db)):
+    import os
+    app = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+    if not app:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+
+    session = ACTIVE_CALL_SESSIONS.get(call_sid) if call_sid else None
+
+    # Check Twilio REST API directly for real-time completion
+    twilio_sid = os.getenv("TWILIO_ACCOUNT_SID", "").strip()
+    twilio_token = os.getenv("TWILIO_AUTH_TOKEN", "").strip()
+
+    is_completed = False
+    duration = 0
+    twilio_call_status = "in-progress"
+
+    if call_sid and twilio_sid and twilio_token and not call_sid.startswith("CA-"):
+        try:
+            from twilio.rest import Client
+            client = Client(twilio_sid, twilio_token)
+            t_call = client.calls(call_sid).fetch()
+            twilio_call_status = t_call.status
+            if t_call.duration and str(t_call.duration).isdigit():
+                duration = int(t_call.duration)
+            if twilio_call_status in ["completed", "busy", "no-answer", "canceled", "failed"]:
+                is_completed = True
+        except Exception:
+            pass
+
+    if session and session.get("status") == "COMPLETED":
+        is_completed = True
+        if session.get("duration_seconds"):
+            duration = session["duration_seconds"]
+
+    digits = session.get("digits_pressed") if session else None
+    outcome = session.get("outcome") if session else None
+
+    if app.confirmation_status == "Confirmed":
+        outcome = "CONFIRMED"
+        digits = digits or "1"
+    elif app.confirmation_status == "Cancelled":
+        outcome = "CANCELLED"
+        digits = digits or "2"
+
+    return {
+        "call_sid": call_sid,
+        "appointment_id": appointment_id,
+        "is_completed": is_completed,
+        "twilio_status": twilio_call_status,
+        "duration_seconds": duration,
+        "digits_pressed": digits,
+        "outcome": outcome or ("COMPLETED_NO_KEY" if is_completed else "IN_CALL"),
+        "confirmation_status": app.confirmation_status,
+        "recovery_status": app.recovery_status
+    }
 
 @router.post("/outbound-call")
 def initiate_outbound_call(req: OutboundCallRequest, db: Session = Depends(get_db)):
@@ -600,14 +694,28 @@ def initiate_outbound_call(req: OutboundCallRequest, db: Session = Depends(get_d
                     </Response>"""
                     call_url = "https://twimlets.com/echo?Twiml=" + urllib.parse.quote(ivr_xml)
 
+                create_params = {
+                    "to": to_number,
+                    "from_": twilio_from,
+                    "url": call_url,
+                }
+                if public_base:
+                    create_params["status_callback"] = f"{public_base}/voice/twiml-status/{app.id}"
+                    create_params["status_callback_event"] = ["completed", "busy", "no-answer", "canceled", "failed"]
+                    create_params["status_callback_method"] = "POST"
+
                 # Create actual outbound Twilio call using verified public URL
-                call = twilio_client.calls.create(
-                    to=to_number,
-                    from_=twilio_from,
-                    url=call_url
-                )
+                call = twilio_client.calls.create(**create_params)
                 call_sid = call.sid
                 twilio_dispatched = True
+
+                ACTIVE_CALL_SESSIONS[call_sid] = {
+                    "call_sid": call_sid,
+                    "appointment_id": app.id,
+                    "status": "IN_PROGRESS",
+                    "phone_number": to_number,
+                    "duration_seconds": 0
+                }
             except Exception as e:
                 clean_err = re.sub(r'\x1b\[[0-9;]*m', '', str(e)).strip()
                 twilio_error = clean_err

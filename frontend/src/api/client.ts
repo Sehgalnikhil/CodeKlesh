@@ -301,4 +301,19 @@ export const api = {
       body: JSON.stringify(payload),
     });
   },
+
+  async getCallStatus(appointmentId: number, callSid?: string): Promise<{
+    call_sid: string;
+    appointment_id: number;
+    is_completed: boolean;
+    twilio_status: string;
+    duration_seconds: number;
+    digits_pressed?: string;
+    outcome: string;
+    confirmation_status: string;
+    recovery_status: string;
+  }> {
+    const q = callSid ? `?call_sid=${callSid}` : '';
+    return request(`/voice/call-status/${appointmentId}${q}`);
+  },
 };
