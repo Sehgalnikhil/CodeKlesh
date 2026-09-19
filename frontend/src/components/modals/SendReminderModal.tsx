@@ -15,7 +15,8 @@ import {
   Smartphone,
   QrCode,
   RefreshCw,
-  Zap
+  Zap,
+  Info
 } from 'lucide-react';
 import { Appointment } from '../../types';
 import { api } from '../../api/client';
@@ -34,6 +35,8 @@ interface WhatsAppGatewayStatus {
   phone: string | null;
   qr_image: string | null;
   has_qr?: boolean;
+  qr_age_seconds?: number;
+  is_expired?: boolean;
 }
 
 export const SendReminderModal: React.FC<SendReminderModalProps> = ({
@@ -48,6 +51,7 @@ export const SendReminderModal: React.FC<SendReminderModalProps> = ({
   const [scheduledFor, setScheduledFor] = useState('Immediate dispatch');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasCopiedWa, setHasCopiedWa] = useState(false);
+  const [isRefreshingQr, setIsRefreshingQr] = useState(false);
 
   // Local WhatsApp Gateway state
   const [gatewayStatus, setGatewayStatus] = useState<WhatsAppGatewayStatus>({
@@ -136,6 +140,18 @@ _SlotSure Smart Healthcare Engine_`;
     showToast(`✓ Opened WhatsApp for ${rawPhone}`, 'info');
   };
 
+  const handleRefreshQr = async () => {
+    setIsRefreshingQr(true);
+    try {
+      await fetch('http://127.0.0.1:5005/refresh-qr', { method: 'POST' });
+      showToast('Generating fresh WhatsApp QR code...', 'info');
+    } catch {
+      showToast('Gateway not responding. Make sure service is running.', 'error');
+    } finally {
+      setTimeout(() => setIsRefreshingQr(false), 1500);
+    }
+  };
+
   const handleSend = async () => {
     setIsSubmitting(true);
     try {
@@ -155,7 +171,6 @@ _SlotSure Smart Healthcare Engine_`;
             const gwData = await gwRes.json();
 
             if (gwData.success) {
-              // Also record in database
               await api.dispatchReminder({
                 appointment_id: appointment.id,
                 patient_id: appointment.patient_id,
@@ -381,23 +396,35 @@ _SlotSure Smart Healthcare Engine_`;
                       </span>
                     </div>
 
-                    <div className="text-[11px] text-emerald-950 space-y-1">
+                    <div className="text-[11px] text-emerald-950 space-y-0.5">
                       <p>1. Open WhatsApp on your phone</p>
                       <p>2. Tap <strong>Settings</strong> (or ⋮) → <strong>Linked Devices</strong></p>
-                      <p>3. Tap <strong>Link a Device</strong> and point your camera here:</p>
+                      <p>3. Tap <strong>Link a Device</strong> and point your camera at this QR code:</p>
                     </div>
 
                     {gatewayStatus.qr_image ? (
-                      <div className="flex flex-col items-center justify-center p-2 bg-white rounded-xl border border-emerald-200 shadow-2xs">
+                      <div className="flex flex-col items-center justify-center p-3 bg-white rounded-xl border border-emerald-200 shadow-2xs space-y-2.5">
                         <img
                           src={gatewayStatus.qr_image}
                           alt="Scan QR Code to Link WhatsApp"
-                          className="w-44 h-44 object-contain rounded-lg"
+                          className="w-48 h-48 object-contain rounded-lg border border-black/5"
                         />
-                        <span className="text-[10px] text-emerald-700 mt-1 flex items-center gap-1">
-                          <RefreshCw className="h-3 w-3 animate-spin text-emerald-600" />
-                          Waiting for device scan... updates automatically
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={handleRefreshQr}
+                            disabled={isRefreshingQr}
+                            className="px-2.5 py-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer"
+                          >
+                            <RefreshCw className={`h-3 w-3 ${isRefreshingQr ? 'animate-spin' : ''}`} />
+                            <span>{isRefreshingQr ? 'Refreshing...' : 'Refresh QR Code'}</span>
+                          </button>
+                          <span className="text-[10px] text-emerald-700">
+                            {gatewayStatus.qr_age_seconds !== undefined && (
+                              <span>Generated {gatewayStatus.qr_age_seconds}s ago</span>
+                            )}
+                          </span>
+                        </div>
                       </div>
                     ) : (
                       <div className="p-4 bg-white rounded-xl border border-emerald-200 text-center text-xs text-[#6B6B6F] flex flex-col items-center justify-center gap-2">
@@ -405,6 +432,13 @@ _SlotSure Smart Healthcare Engine_`;
                         <span>Initializing local WhatsApp gateway...</span>
                       </div>
                     )}
+
+                    <div className="p-2.5 bg-amber-50/80 border border-amber-200/80 rounded-xl flex items-start gap-2 text-[11px] text-amber-900">
+                      <Info className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                      <p>
+                        <strong>Got "Check your connection"?</strong> WhatsApp QR codes expire every ~20 seconds. Click <strong>Refresh QR Code</strong> above, then scan immediately with your camera ready!
+                      </p>
+                    </div>
 
                     <div className="pt-1 flex items-center justify-between text-[11px]">
                       <span className="text-[#6B6B6F]">Don't want to scan now?</span>

@@ -3,11 +3,14 @@ const cors = require('cors');
 const qrcode = require('qrcode');
 const qrcodeTerminal = require('qrcode-terminal');
 const pino = require('pino');
+const fs = require('fs');
+const path = require('path');
 const {
   default: makeWASocket,
   useMultiFileAuthState,
   DisconnectReason,
-  fetchLatestBaileysVersion,
+  fetchLatestWaWebVersion,
+  Browsers,
 } = require('@whiskeysockets/baileys');
 
 const app = express();
@@ -15,25 +18,40 @@ app.use(cors());
 app.use(express.json());
 
 const PORT = process.env.PORT || 5005;
+const AUTH_DIR = path.join(__dirname, 'auth_info_baileys');
 
 let sock = null;
 let qrRaw = null;
 let qrDataUrl = null;
+let qrTimestamp = null;
 let connectionStatus = 'INITIALIZING';
 let connectedPhone = null;
+let isStarting = false;
 
 async function startWhatsApp() {
+  if (isStarting) return;
+  isStarting = true;
+
   try {
-    const { state, saveCreds } = await useMultiFileAuthState('./auth_info_baileys');
-    const { version, isLatest } = await fetchLatestBaileysVersion();
-    console.log(`Using Baileys v${version.join('.')}, isLatest: ${isLatest}`);
+    if (!fs.existsSync(AUTH_DIR)) {
+      fs.mkdirSync(AUTH_DIR, { recursive: true });
+    }
+
+    const { state, saveCreds } = await useMultiFileAuthState(AUTH_DIR);
+    const { version, isLatest } = await fetchLatestWaWebVersion().catch(() => ({
+      version: [2, 3000, 1047967752],
+      isLatest: true,
+    }));
+    console.log(`Using WhatsApp Web v${version.join('.')}, isLatest: ${isLatest}`);
 
     sock = makeWASocket({
       version,
       logger: pino({ level: 'silent' }),
       auth: state,
       printQRInTerminal: false,
-      browser: ['SlotSure Clinic', 'Chrome', '120.0.0.0'],
+      browser: Browsers.ubuntu('Chrome'),
+      connectTimeoutMs: 60000,
+      defaultQueryTimeoutMs: 60000,
     });
 
     sock.ev.on('creds.update', saveCreds);
@@ -43,11 +61,12 @@ async function startWhatsApp() {
 
       if (qr) {
         qrRaw = qr;
+        qrTimestamp = Date.now();
         connectionStatus = 'SCAN_QR';
         try {
-          qrDataUrl = await qrcode.toDataURL(qr);
+          qrDataUrl = await qrcode.toDataURL(qr, { margin: 2, scale: 7 });
           console.log('\n=============================================');
-          console.log('📱 SCAN THIS QR CODE IN WHATSAPP TO LINK:');
+          console.log('📱 FRESH WHATSAPP QR CODE GENERATED:');
           console.log('=============================================');
           qrcodeTerminal.generate(qr, { small: true });
           console.log('=============================================\n');
@@ -57,16 +76,28 @@ async function startWhatsApp() {
       }
 
       if (connection === 'close') {
-        const shouldReconnect =
-          lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
-        console.log('Connection closed due to:', lastDisconnect?.error, ', reconnecting:', shouldReconnect);
+        const statusCode = lastDisconnect?.error?.output?.statusCode;
+        const shouldReconnect = statusCode !== DisconnectReason.loggedOut;
+        console.log(`Connection closed (status: ${statusCode}), reconnecting: ${shouldReconnect}`);
         connectionStatus = 'DISCONNECTED';
         connectedPhone = null;
         qrRaw = null;
         qrDataUrl = null;
 
         if (shouldReconnect) {
-          setTimeout(startWhatsApp, 3000);
+          setTimeout(() => {
+            isStarting = false;
+            startWhatsApp();
+          }, 3000);
+        } else {
+          // Logged out - clean auth folder
+          try {
+            fs.rmSync(AUTH_DIR, { recursive: true, force: true });
+          } catch {}
+          setTimeout(() => {
+            isStarting = false;
+            startWhatsApp();
+          }, 2000);
         }
       } else if (connection === 'open') {
         console.log('✅ SlotSure WhatsApp Gateway is CONNECTED & READY!');
@@ -81,7 +112,7 @@ async function startWhatsApp() {
       }
     });
 
-    // Listen for incoming messages (e.g. patients replying "1" or "2")
+    // Listen for incoming messages
     sock.ev.on('messages.upsert', async ({ messages, type }) => {
       if (type === 'notify') {
         for (const msg of messages) {
@@ -98,18 +129,44 @@ async function startWhatsApp() {
     });
   } catch (error) {
     console.error('Error starting WhatsApp client:', error);
-    setTimeout(startWhatsApp, 5000);
+    setTimeout(() => {
+      isStarting = false;
+      startWhatsApp();
+    }, 5000);
+  } finally {
+    isStarting = false;
   }
 }
 
-// REST Endpoints
+// Endpoints
 app.get('/status', (req, res) => {
+  const ageSeconds = qrTimestamp ? Math.round((Date.now() - qrTimestamp) / 1000) : 0;
   res.json({
     status: connectionStatus,
     phone: connectedPhone ? `+${connectedPhone}` : null,
     qr_image: qrDataUrl,
     has_qr: !!qrDataUrl,
+    qr_age_seconds: ageSeconds,
+    is_expired: ageSeconds > 25,
   });
+});
+
+app.post('/refresh-qr', async (req, res) => {
+  console.log('User requested fresh QR code...');
+  try {
+    // If not connected, restart socket to generate fresh QR immediately
+    if (connectionStatus !== 'CONNECTED') {
+      try {
+        if (sock) sock.end(new Error('Refreshing QR'));
+      } catch {}
+      isStarting = false;
+      setTimeout(startWhatsApp, 1000);
+      return res.json({ success: true, message: 'Generating fresh QR...' });
+    }
+    return res.json({ success: false, message: 'Already connected' });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
 });
 
 app.post('/send', async (req, res) => {
@@ -122,15 +179,14 @@ app.post('/send', async (req, res) => {
     if (connectionStatus !== 'CONNECTED' || !sock) {
       return res.status(503).json({
         success: false,
-        error: 'WhatsApp gateway is not connected yet. Please scan the QR code first.',
+        error: 'WhatsApp gateway is not connected yet. Please link your WhatsApp first.',
         status: connectionStatus,
       });
     }
 
-    // Clean phone number to E.164 without leading '+' or special chars
     let clean = phone.replace(/[^0-9]/g, '');
     if (clean.length === 10) {
-      clean = '91' + clean; // Default to India (+91) if 10 digits
+      clean = '91' + clean;
     }
 
     const jid = `${clean}@s.whatsapp.net`;
