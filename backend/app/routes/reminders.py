@@ -40,6 +40,50 @@ def dispatch_reminder(
                 appointment.prediction.risk_level = "MEDIUM"
 
     now = datetime.utcnow()
+    notes = reminder_in.notes or f"Automated {reminder_in.channel} reminder triggered by clinic staff"
+
+    # Attempt real carrier dispatch if Twilio credentials are configured
+    import os
+    account_sid = os.getenv("TWILIO_ACCOUNT_SID", "").strip()
+    auth_token = os.getenv("TWILIO_AUTH_TOKEN", "").strip()
+    from_phone = os.getenv("TWILIO_PHONE_NUMBER", "").strip()
+
+    if account_sid and auth_token:
+        try:
+            from twilio.rest import Client
+            client = Client(account_sid, auth_token)
+            clean_to = patient.phone.strip().replace(" ", "").replace("-", "")
+            if not clean_to.startswith("+"):
+                clean_to = f"+91{clean_to.lstrip('0')}"
+
+            if reminder_in.channel == "SMS" and from_phone:
+                sms_body = (
+                    f"SlotSure Clinic Reminder: Hello {patient.first_name}, you have an appointment with "
+                    f"{appointment.doctor_name} on {appointment.appointment_date} at {appointment.appointment_time}. "
+                    f"Reply 1 to Confirm or 2 to Cancel."
+                )
+                client.messages.create(to=clean_to, from_=from_phone, body=sms_body)
+                notes += " (Dispatched via Twilio SMS carrier)"
+
+            elif reminder_in.channel == "WhatsApp":
+                wa_body = (
+                    f"🏥 *SlotSure Clinic Appointment Confirmation*\n\n"
+                    f"Hello *{patient.first_name} {patient.last_name}*, you have an upcoming consultation:\n"
+                    f"👨‍⚕️ *Doctor:* {appointment.doctor_name} ({appointment.department})\n"
+                    f"📅 *Date:* {appointment.appointment_date}\n"
+                    f"⏰ *Time:* {appointment.appointment_time}\n\n"
+                    f"Please reply *1* to CONFIRM or *2* to RESCHEDULE.\n"
+                    f"_SlotSure Healthcare Engine_"
+                )
+                # Attempt Twilio WhatsApp sandbox/sender
+                try:
+                    client.messages.create(to=f"whatsapp:{clean_to}", from_="whatsapp:+14155238886", body=wa_body)
+                    notes += " (Dispatched via Twilio WhatsApp Gateway)"
+                except Exception:
+                    pass
+        except Exception as err:
+            print(f"Carrier notification notice: {err}")
+
     reminder = Reminder(
         appointment_id=reminder_in.appointment_id,
         patient_id=reminder_in.patient_id,
@@ -47,7 +91,7 @@ def dispatch_reminder(
         status="Sent",
         scheduled_for=reminder_in.scheduled_for or "24 hours before appointment",
         sent_at=now,
-        notes=reminder_in.notes or f"Automated {reminder_in.channel} reminder triggered by clinic staff"
+        notes=notes
     )
     db.add(reminder)
     db.commit()

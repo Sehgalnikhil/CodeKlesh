@@ -295,6 +295,11 @@ const MainAppContent: React.FC = () => {
         onReminderSent={() => {
           loadAllData();
         }}
+        onTriggerCall={(app) => {
+          setReminderModalApp(null);
+          setOutboundAppointment(app);
+          setIsOutboundCallOpen(true);
+        }}
       />
 
       {/* Add Patient Modal */}

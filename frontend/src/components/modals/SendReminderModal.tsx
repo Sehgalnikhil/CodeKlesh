@@ -1,6 +1,19 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquare, Phone, Send, X, ArrowRight, ShieldCheck, CheckCircle2, Loader2 } from 'lucide-react';
+import {
+  MessageSquare,
+  PhoneCall,
+  Send,
+  X,
+  ArrowRight,
+  ExternalLink,
+  Copy,
+  CheckCheck,
+  CheckCircle2,
+  Loader2,
+  Sparkles,
+  Smartphone
+} from 'lucide-react';
 import { Appointment } from '../../types';
 import { api } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
@@ -10,6 +23,7 @@ interface SendReminderModalProps {
   isOpen: boolean;
   onClose: () => void;
   onReminderSent: (updatedAppointment?: Appointment) => void;
+  onTriggerCall?: (appointment: Appointment) => void;
 }
 
 export const SendReminderModal: React.FC<SendReminderModalProps> = ({
@@ -17,16 +31,52 @@ export const SendReminderModal: React.FC<SendReminderModalProps> = ({
   isOpen,
   onClose,
   onReminderSent,
+  onTriggerCall,
 }) => {
   const { showToast } = useAuth();
-  const [channel, setChannel] = useState<'SMS' | 'WhatsApp' | 'Phone Call'>('SMS');
-  const [scheduledFor, setScheduledFor] = useState('24 hours before appointment');
+  const [channel, setChannel] = useState<'SMS' | 'WhatsApp' | 'Phone Call'>('WhatsApp');
+  const [scheduledFor, setScheduledFor] = useState('Immediate dispatch');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [hasCopiedWa, setHasCopiedWa] = useState(false);
 
   if (!isOpen || !appointment) return null;
 
-  const currentProb = Math.round((appointment.prediction?.risk_probability || 0.82) * 100);
-  const impactProb = Math.round((appointment.prediction?.estimated_impact_prob || Math.max(0.12, (appointment.prediction?.risk_probability || 0.82) * 0.45)) * 100);
+  const patient = appointment.patient;
+  const currentProb = Math.round((appointment.prediction?.risk_probability || 0.70) * 100);
+  const impactProb = Math.round((appointment.prediction?.estimated_impact_prob || Math.max(0.12, (appointment.prediction?.risk_probability || 0.70) * 0.45)) * 100);
+
+  // Clean phone number for WhatsApp wa.me link
+  const rawPhone = patient?.phone || '+917027635901';
+  const cleanPhone = rawPhone.replace(/[^0-9]/g, '');
+
+  // Formatted clinical WhatsApp confirmation text
+  const whatsappMessage = 
+`🏥 *SlotSure Clinic Appointment Confirmation*
+
+Hello *${patient?.first_name || 'Patient'} ${patient?.last_name || ''}*, this is a clinical reminder for your upcoming appointment:
+
+👨‍⚕️ *Doctor:* ${appointment.doctor_name} (${appointment.department})
+📅 *Date:* ${appointment.appointment_date}
+⏰ *Time:* ${appointment.appointment_time}
+📍 *Location:* SlotSure Central Clinic
+
+Please reply to this message:
+1️⃣ Reply *1* to *CONFIRM* your appointment
+2️⃣ Reply *2* to *RESCHEDULE* or *CANCEL*
+
+_SlotSure Smart Healthcare Engine_`;
+
+  const whatsappUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(whatsappMessage)}`;
+
+  // Formatted SMS text
+  const smsMessage = `SlotSure Clinic: Hello ${patient?.first_name}, you have an appointment with ${appointment.doctor_name} on ${appointment.appointment_date} at ${appointment.appointment_time}. Reply 1 to Confirm or 2 to Cancel.`;
+
+  const copyWhatsAppText = () => {
+    navigator.clipboard.writeText(whatsappMessage);
+    setHasCopiedWa(true);
+    showToast('✓ WhatsApp confirmation message copied', 'info');
+    setTimeout(() => setHasCopiedWa(false), 2000);
+  };
 
   const handleSend = async () => {
     setIsSubmitting(true);
@@ -36,10 +86,23 @@ export const SendReminderModal: React.FC<SendReminderModalProps> = ({
         patient_id: appointment.patient_id,
         channel,
         scheduled_for: scheduledFor,
-        notes: `Clinical intervention dispatched via ${channel} to ${appointment.patient?.first_name} ${appointment.patient?.last_name}`,
+        notes: `Clinical intervention dispatched via ${channel} to ${patient?.first_name} ${patient?.last_name}`,
       });
 
-      showToast(`✓ Reminder dispatched: ${channel} sent to ${appointment.patient?.phone}`, 'success');
+      if (channel === 'WhatsApp') {
+        // Open WhatsApp Web/App with pre-filled message
+        window.open(whatsappUrl, '_blank');
+        showToast(`✓ WhatsApp message opened for ${patient?.phone}`, 'success');
+      } else if (channel === 'Phone Call' && onTriggerCall) {
+        showToast(`✓ Launching AI Phone Call for ${patient?.first_name}`, 'success');
+        onReminderSent();
+        onClose();
+        onTriggerCall(appointment);
+        return;
+      } else {
+        showToast(`✓ Reminder dispatched: ${channel} sent to ${patient?.phone}`, 'success');
+      }
+
       onReminderSent();
       onClose();
     } catch (err: any) {
@@ -51,18 +114,18 @@ export const SendReminderModal: React.FC<SendReminderModalProps> = ({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-150">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-md">
         <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 10 }}
+          initial={{ opacity: 0, scale: 0.95, y: 12 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 10 }}
-          transition={{ type: 'spring', damping: 26, stiffness: 350 }}
-          className="bg-white/95 dark:bg-[#181818]/95 backdrop-blur-2xl border border-black/[0.08] dark:border-white/[0.1] rounded-2xl shadow-xl max-w-md w-full overflow-hidden"
+          exit={{ opacity: 0, scale: 0.95, y: 12 }}
+          transition={{ type: 'spring', damping: 28, stiffness: 340 }}
+          className="bg-white dark:bg-[#181818] border border-black/[0.08] dark:border-white/[0.1] rounded-3xl shadow-[0_24px_64px_rgba(0,0,0,0.14)] max-w-lg w-full overflow-hidden flex flex-col"
         >
-          {/* Header */}
-          <div className="p-5 border-b border-black/[0.06] dark:border-white/[0.08] flex items-center justify-between">
+          {/* ===================== HEADER ===================== */}
+          <div className="p-5 border-b border-black/[0.06] dark:border-white/[0.08] flex items-center justify-between bg-[#FAFAFA] dark:bg-white/[0.02]">
             <div className="flex items-center gap-2.5">
-              <div className="h-8 w-8 rounded-lg bg-black/[0.04] dark:bg-white/[0.06] text-[#1D1D1F] dark:text-white flex items-center justify-center">
+              <div className="h-9 w-9 rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400 flex items-center justify-center shadow-2xs">
                 <Send className="h-4 w-4" />
               </div>
               <div>
@@ -70,117 +133,266 @@ export const SendReminderModal: React.FC<SendReminderModalProps> = ({
                   Send Clinical Reminder
                 </h3>
                 <p className="text-xs text-[#6B6B6F]">
-                  Patient: {appointment.patient?.first_name} {appointment.patient?.last_name}
+                  {patient?.first_name} {patient?.last_name} · {appointment.appointment_time}
                 </p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="text-[#6B6B6F] hover:text-[#1D1D1F] dark:hover:text-white p-1"
+              className="h-8 w-8 rounded-full border border-black/[0.08] dark:border-white/[0.1] bg-black/[0.02] hover:bg-black/[0.06] flex items-center justify-center text-[#6B6B6F] hover:text-[#1D1D1F] transition-all cursor-pointer"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
 
-          <div className="p-5 space-y-4">
+          <div className="p-5 space-y-4 overflow-y-auto max-h-[80vh]">
             {/* Impact Projection Card */}
-            <div className="p-3.5 bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.04] dark:border-white/[0.06] rounded-xl space-y-2">
+            <div className="p-3.5 bg-[#F8F9FA] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.06] rounded-2xl space-y-2">
               <div className="flex items-center justify-between text-xs">
                 <span className="font-medium text-[#6B6B6F]">
-                  Estimated Risk Reduction
+                  Projected Risk Reduction
                 </span>
-                <span className="text-[10px] font-semibold text-[#4F8A70] bg-[#4F8A70]/10 px-2 py-0.5 rounded-full">
-                  Model Projection
+                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-full">
+                  ML Projection
                 </span>
               </div>
               <div className="flex items-center gap-3">
-                <span className="text-xl font-semibold text-[#C9685B]">
+                <span className="text-lg font-bold text-rose-600">
                   {currentProb}%
                 </span>
-                <ArrowRight className="h-4 w-4 text-[#6B6B6F]" />
-                <span className="text-xl font-semibold text-[#4F8A70]">
+                <ArrowRight className="h-4 w-4 text-[#86868B]" />
+                <span className="text-lg font-bold text-emerald-600">
                   {impactProb}%
                 </span>
-                <span className="text-xs font-semibold text-[#4F8A70] bg-[#4F8A70]/10 px-2 py-0.5 rounded">
-                  -{currentProb - impactProb}% Risk
+                <span className="text-xs font-semibold text-emerald-700 bg-emerald-100/60 px-2 py-0.5 rounded-md">
+                  -{Math.max(1, currentProb - impactProb)}% Risk
                 </span>
               </div>
-              <p className="text-[11px] text-[#6B6B6F]">
-                Automated 2-way confirmation message with quick confirmation link.
+              <p className="text-[11px] text-[#6B6B6F] leading-relaxed">
+                Automated two-way communication to confirm attendance and protect clinic schedule capacity.
               </p>
             </div>
 
-            {/* Channel Selection */}
+            {/* Channel Selection Buttons */}
             <div>
-              <label className="block text-xs font-medium text-[#1D1D1F] dark:text-white mb-1.5">
+              <label className="block text-xs font-semibold text-[#1D1D1F] dark:text-white mb-2">
                 Communication Channel
               </label>
               <div className="grid grid-cols-3 gap-2">
-                {(['SMS', 'WhatsApp', 'Phone Call'] as const).map(ch => (
-                  <button
-                    key={ch}
-                    type="button"
-                    onClick={() => setChannel(ch)}
-                    className={`py-2 px-3 rounded-xl border text-xs font-medium flex flex-col items-center gap-1.5 transition-all ${
-                      channel === ch
-                        ? 'border-[#1D1D1F] dark:border-white bg-[#1D1D1F] dark:bg-white text-white dark:text-[#1D1D1F] shadow-sm'
-                        : 'border-black/[0.06] dark:border-white/[0.08] text-[#6B6B6F] hover:text-[#1D1D1F] dark:hover:text-white'
-                    }`}
-                  >
-                    {ch === 'SMS' && <MessageSquare className="h-4 w-4" />}
-                    {ch === 'WhatsApp' && <CheckCircle2 className="h-4 w-4" />}
-                    {ch === 'Phone Call' && <Phone className="h-4 w-4" />}
-                    <span>{ch}</span>
-                  </button>
-                ))}
+                {/* 1. SMS */}
+                <button
+                  type="button"
+                  onClick={() => setChannel('SMS')}
+                  className={`py-2.5 px-3 rounded-2xl border text-xs font-semibold flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
+                    channel === 'SMS'
+                      ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-2xs'
+                      : 'border-black/[0.08] hover:bg-black/[0.02] text-[#6B6B6F] hover:text-[#1D1D1F]'
+                  }`}
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  <span>SMS</span>
+                </button>
+
+                {/* 2. WhatsApp */}
+                <button
+                  type="button"
+                  onClick={() => setChannel('WhatsApp')}
+                  className={`py-2.5 px-3 rounded-2xl border text-xs font-semibold flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
+                    channel === 'WhatsApp'
+                      ? 'border-emerald-600 bg-emerald-50 text-emerald-800 shadow-2xs'
+                      : 'border-black/[0.08] hover:bg-black/[0.02] text-[#6B6B6F] hover:text-[#1D1D1F]'
+                  }`}
+                >
+                  <div className="flex items-center gap-1">
+                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                    <span>WhatsApp</span>
+                  </div>
+                </button>
+
+                {/* 3. Phone Call */}
+                <button
+                  type="button"
+                  onClick={() => setChannel('Phone Call')}
+                  className={`py-2.5 px-3 rounded-2xl border text-xs font-semibold flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
+                    channel === 'Phone Call'
+                      ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-2xs'
+                      : 'border-black/[0.08] hover:bg-black/[0.02] text-[#6B6B6F] hover:text-[#1D1D1F]'
+                  }`}
+                >
+                  <PhoneCall className="h-4 w-4" />
+                  <span>Phone Call</span>
+                </button>
               </div>
             </div>
 
+            {/* ================= CHANNEL CONTENT PREVIEWS ================= */}
+
+            {/* WHATSAPP CONTENT */}
+            {channel === 'WhatsApp' && (
+              <motion.div
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-3"
+              >
+                <div className="p-3.5 bg-emerald-50/70 border border-emerald-200 rounded-2xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                      <span>WhatsApp 2-Way Confirmation Message</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={copyWhatsAppText}
+                      className="text-[11px] text-emerald-700 hover:text-emerald-900 font-medium flex items-center gap-1 cursor-pointer"
+                    >
+                      {hasCopiedWa ? <CheckCheck className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                      <span>{hasCopiedWa ? 'Copied' : 'Copy Text'}</span>
+                    </button>
+                  </div>
+
+                  <div className="p-3 bg-white border border-emerald-200/60 rounded-xl text-xs text-[#1D1D1F] font-mono whitespace-pre-wrap leading-relaxed shadow-2xs max-h-48 overflow-y-auto">
+                    {whatsappMessage}
+                  </div>
+
+                  <div className="flex items-center justify-between text-[11px] text-emerald-800 pt-1">
+                    <span>Recipient: <strong>{rawPhone}</strong></span>
+                    <span className="text-[10px] bg-emerald-100/60 text-emerald-800 px-2 py-0.5 rounded-full font-semibold">
+                      1-Click Direct Delivery
+                    </span>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* SMS CONTENT */}
+            {channel === 'SMS' && (
+              <motion.div
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-3"
+              >
+                <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-2xl space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
+                      <MessageSquare className="h-4 w-4 text-blue-600" />
+                      <span>Carrier SMS Preview</span>
+                    </span>
+                    <span className="text-[11px] text-[#6B6B6F] font-mono">
+                      {smsMessage.length} chars
+                    </span>
+                  </div>
+
+                  <div className="p-3 bg-white border border-blue-200/60 rounded-xl text-xs text-[#1D1D1F] font-mono leading-relaxed shadow-2xs">
+                    {smsMessage}
+                  </div>
+
+                  <div className="text-[11px] text-[#6B6B6F]">
+                    Sent to: <strong className="text-[#1D1D1F]">{rawPhone}</strong> via Twilio SMS Gateway.
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* PHONE CALL CONTENT */}
+            {channel === 'Phone Call' && (
+              <motion.div
+                initial={{ opacity: 0, y: 4 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="space-y-3"
+              >
+                <div className="p-3.5 bg-indigo-50/70 border border-indigo-200 rounded-2xl space-y-2.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
+                      <PhoneCall className="h-4 w-4 text-indigo-600" />
+                      <span>SlotSure Conversational AI Call</span>
+                    </span>
+                    <span className="text-[10px] bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full font-semibold">
+                      Speech + DTMF Sync
+                    </span>
+                  </div>
+
+                  <p className="text-xs text-indigo-950 leading-relaxed">
+                    Dials <strong>{rawPhone}</strong> to speak clinical details, warn about past missed visits, and record patient confirmation or cancellation directly.
+                  </p>
+
+                  {onTriggerCall && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onTriggerCall(appointment);
+                      }}
+                      className="w-full py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition-all shadow-2xs flex items-center justify-center gap-2 cursor-pointer"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" />
+                      <span>Open Live AI Call Console ({rawPhone})</span>
+                    </button>
+                  )}
+                </div>
+              </motion.div>
+            )}
+
             {/* Timing Selection */}
             <div>
-              <label className="block text-xs font-medium text-[#1D1D1F] dark:text-white mb-1.5">
+              <label className="block text-xs font-semibold text-[#1D1D1F] dark:text-white mb-1.5">
                 Dispatch Schedule
               </label>
               <select
                 value={scheduledFor}
                 onChange={e => setScheduledFor(e.target.value)}
-                className="w-full text-xs px-3 py-2 bg-white dark:bg-zinc-800 border border-black/[0.08] dark:border-white/[0.1] rounded-xl text-[#1D1D1F] dark:text-white focus:outline-none"
+                className="w-full text-xs px-3 py-2.5 bg-white dark:bg-zinc-800 border border-black/[0.12] dark:border-white/[0.1] rounded-xl text-[#1D1D1F] dark:text-white focus:outline-hidden focus:border-blue-500 shadow-2xs"
               >
+                <option value="Immediate dispatch">Immediate Dispatch (Send Now)</option>
                 <option value="24 hours before appointment">24 hours before appointment (Recommended)</option>
                 <option value="48 hours before appointment">48 hours before appointment</option>
-                <option value="Immediate dispatch">Send Immediately</option>
                 <option value="Morning of appointment (7:00 AM)">Morning of appointment (7:00 AM)</option>
               </select>
             </div>
-
-            {/* Phone Confirmation */}
-            <div className="p-3 bg-black/[0.02] dark:bg-white/[0.03] rounded-xl text-xs text-[#6B6B6F]">
-              <span className="font-semibold text-[#1D1D1F] dark:text-white">Recipient: </span>
-              {appointment.patient?.phone} ({appointment.patient?.first_name} {appointment.patient?.last_name})
-            </div>
           </div>
 
-          {/* Footer */}
-          <div className="p-4 border-t border-black/[0.06] dark:border-white/[0.08] flex items-center justify-end gap-2.5">
-            <button
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="px-3.5 py-1.5 text-xs font-medium text-[#6B6B6F] hover:text-[#1D1D1F] dark:hover:text-white rounded-xl transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSend}
-              disabled={isSubmitting}
-              className="px-4 py-1.5 text-xs font-medium text-white dark:text-[#1D1D1F] bg-[#1D1D1F] dark:bg-white hover:bg-[#2C2C2E] dark:hover:bg-[#E5E5EA] rounded-xl shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50"
-            >
-              {isSubmitting ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-              ) : (
-                <Send className="h-3.5 w-3.5" />
-              )}
-              <span>Send Reminder</span>
-            </button>
+          {/* ===================== FOOTER ===================== */}
+          <div className="p-4 border-t border-black/[0.06] dark:border-white/[0.08] flex items-center justify-between bg-[#FAFAFA] dark:bg-white/[0.02]">
+            <div className="text-xs text-[#6B6B6F] flex items-center gap-1.5">
+              <Smartphone className="h-3.5 w-3.5 text-[#86868B]" />
+              <span>{rawPhone}</span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onClose}
+                disabled={isSubmitting}
+                className="px-3.5 py-2 text-xs font-semibold text-[#6B6B6F] hover:text-[#1D1D1F] rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+
+              <button
+                onClick={handleSend}
+                disabled={isSubmitting}
+                className={`px-4 py-2 text-xs font-semibold text-white rounded-xl shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer ${
+                  channel === 'WhatsApp'
+                    ? 'bg-emerald-600 hover:bg-emerald-700'
+                    : channel === 'Phone Call'
+                    ? 'bg-indigo-600 hover:bg-indigo-700'
+                    : 'bg-blue-600 hover:bg-blue-700'
+                }`}
+              >
+                {isSubmitting ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : channel === 'WhatsApp' ? (
+                  <ExternalLink className="h-3.5 w-3.5" />
+                ) : (
+                  <Send className="h-3.5 w-3.5" />
+                )}
+                <span>
+                  {channel === 'WhatsApp'
+                    ? 'Send on WhatsApp'
+                    : channel === 'Phone Call'
+                    ? 'Launch AI Call'
+                    : 'Send SMS'}
+                </span>
+              </button>
+            </div>
           </div>
         </motion.div>
       </div>
