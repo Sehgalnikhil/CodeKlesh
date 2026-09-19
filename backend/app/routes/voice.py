@@ -1,7 +1,7 @@
 import re
 from datetime import date, datetime, timedelta
 from typing import Optional, List, Dict, Any
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from ..database import get_db
@@ -381,6 +381,132 @@ def get_telephony_config():
         "twilio_from": phone
     }
 
+def get_public_base_url() -> Optional[str]:
+    import os
+    env_url = os.getenv("PUBLIC_WEBHOOK_URL")
+    if env_url:
+        return env_url.rstrip("/")
+    try:
+        import urllib.request
+        import json
+        with urllib.request.urlopen("http://127.0.0.1:4040/api/tunnels", timeout=1.0) as r:
+            data = json.loads(r.read().decode())
+            for tun in data.get("tunnels", []):
+                pub = tun.get("public_url", "")
+                if pub.startswith("https://"):
+                    return pub.rstrip("/")
+    except Exception:
+        pass
+    return None
+
+@router.api_route("/twiml-ivr/{appointment_id}", methods=["GET", "POST"])
+def twiml_ivr_endpoint(appointment_id: int, request: Request, lang: Optional[str] = "en", db: Session = Depends(get_db)):
+    app = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+    if not app:
+        xml = '<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice" language="en-IN">Appointment not found. Goodbye.</Say></Response>'
+        return Response(content=xml, media_type="application/xml")
+
+    patient = app.patient
+    patient_name = f"{patient.first_name} {patient.last_name}" if patient else "Patient"
+    missed_count = patient.missed_appointments if patient else 0
+
+    try:
+        dt = datetime.strptime(app.appointment_date, "%Y-%m-%d")
+        readable_date = dt.strftime("%A, %B %d")
+    except Exception:
+        readable_date = app.appointment_date
+
+    if lang == "hi":
+        missed_clause = f"Hamare clinical records ke mutabiq aapka pichhla {missed_count} appointment miss hua tha. " if missed_count > 0 else ""
+        prompt_text = (
+            f"Namaste {patient.first_name if patient else ''} ji. Yeh SlotSure Clinic se ek automated priority confirmation call hai. "
+            f"Aapka aane wala appointment {app.doctor_name} ke sath {app.department} mein {readable_date} ko {app.appointment_time} baje scheduled hai. "
+            f"{missed_clause}"
+            f"Apne reserved slot ko surakshit karne aur aane ki pushti ke liye, kripya 1 dabayein. "
+            f"Yadi aap nahi aa sakte aur slot cancel karna chahte hain, toh kripya 2 dabayein."
+        )
+        voice_tag = '<Say voice="alice" language="hi-IN">'
+    else:
+        if missed_count == 1:
+            missed_clause = "Our clinic records note 1 previously missed visit. "
+        elif missed_count > 1:
+            missed_clause = f"Our clinic records note {missed_count} previously missed visits. "
+        else:
+            missed_clause = "To ensure proper clinical capacity and doctor availability, "
+
+        prompt_text = (
+            f"Hello {patient.first_name if patient else ''}, this is an automated priority confirmation call from SlotSure Healthcare "
+            f"regarding your upcoming appointment with {app.doctor_name} in {app.department} on {readable_date} at {app.appointment_time}. "
+            f"{missed_clause}"
+            f"To protect your reserved slot and confirm your attendance, please press 1. "
+            f"If you are unable to attend and need to release this slot for an urgent patient, please press 2."
+        )
+        voice_tag = '<Say voice="alice" language="en-IN">'
+
+    base_url = get_public_base_url() or ""
+    action_url = f"{base_url}/voice/twiml-action/{appointment_id}"
+
+    xml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Gather numDigits="1" action="{action_url}" method="POST" timeout="12">
+        {voice_tag}{prompt_text}</Say>
+    </Gather>
+    {voice_tag}We did not receive any keypress. Please call clinic reception back if you need assistance. Goodbye.</Say>
+</Response>"""
+    return Response(content=xml, media_type="application/xml")
+
+@router.api_route("/twiml-action/{appointment_id}", methods=["GET", "POST"])
+async def twiml_action_endpoint(appointment_id: int, request: Request, db: Session = Depends(get_db)):
+    form_data = await request.form()
+    digits = form_data.get("Digits", "")
+    call_sid = form_data.get("CallSid", "")
+    from_number = form_data.get("From", "")
+
+    app = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+    if not app:
+        return Response(content='<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice" language="en-IN">Appointment not found. Goodbye.</Say></Response>', media_type="application/xml")
+
+    from ..models import SlotRecovery
+    if digits == "1":
+        app.confirmation_status = "Confirmed"
+        app.recovery_status = "Normal"
+        app.notes = (app.notes or "") + f" [Twilio Phone DTMF Key 1: Confirmed via Phone Call {call_sid}]"
+        rec = db.query(SlotRecovery).filter(SlotRecovery.appointment_id == app.id, SlotRecovery.status == "Proposed").first()
+        if rec:
+            rec.status = "Dismissed"
+        db.commit()
+        reply_xml = """<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="alice" language="en-IN">Thank you! Your attendance has been confirmed on SlotSure. Your reserved slot is fully secured. Have a wonderful day. Goodbye.</Say>
+</Response>"""
+    elif digits == "2":
+        app.confirmation_status = "Cancelled"
+        app.recovery_status = "Action Required"
+        app.notes = (app.notes or "") + f" [Twilio Phone DTMF Key 2: Cancelled via Phone Call {call_sid}]"
+        rec = db.query(SlotRecovery).filter(SlotRecovery.appointment_id == app.id).first()
+        if not rec:
+            rec = SlotRecovery(
+                appointment_id=app.id,
+                trigger_reason="Patient touchtone cancellation via AI cellular call (Key 2)",
+                status="Active",
+                recovery_plan="Queue waitlist match and trigger outreach"
+            )
+            db.add(rec)
+        else:
+            rec.status = "Active"
+        db.commit()
+        reply_xml = """<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="alice" language="en-IN">Your appointment has been cancelled and the slot is released for standby patients. Thank you for notifying SlotSure. Goodbye.</Say>
+</Response>"""
+    else:
+        reply_xml = """<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Say voice="alice" language="en-IN">Thank you for contacting SlotSure Healthcare. Goodbye.</Say>
+</Response>"""
+
+    return Response(content=reply_xml, media_type="application/xml")
+
 @router.post("/outbound-call")
 def initiate_outbound_call(req: OutboundCallRequest, db: Session = Depends(get_db)):
     app = db.query(Appointment).filter(Appointment.id == req.appointment_id).first()
@@ -452,6 +578,7 @@ def initiate_outbound_call(req: OutboundCallRequest, db: Session = Depends(get_d
     else:
         to_number = raw_to
 
+    public_base = get_public_base_url()
     if req.mode == "twilio":
         if not (twilio_sid and twilio_token and twilio_from):
             twilio_error = "Missing Twilio credentials. Please enter Account SID, Auth Token, and Twilio Phone Number in the settings panel."
@@ -461,19 +588,23 @@ def initiate_outbound_call(req: OutboundCallRequest, db: Session = Depends(get_d
                 from twilio.rest import Client
                 twilio_client = Client(twilio_sid, twilio_token)
                 
-                ivr_xml = f"""<Response>
-                    <Gather numDigits="1" timeout="10" action="https://twimlets.com/echo?Twiml=%3CResponse%3E%3CSay%20voice%3D%22Polly.Aditi%22%20language%3D%22en-IN%22%3EThank%20you.%20Your%20touchtone%20response%20has%20been%20registered%20on%20SlotSure.%20Goodbye.%3C%2FSay%3E%3C%2FResponse%3E">
-                        <Say voice="Polly.Aditi" language="en-IN">{script}</Say>
-                    </Gather>
-                    <Say voice="Polly.Aditi" language="en-IN">We did not receive any keypress. Please call clinic reception back. Goodbye.</Say>
-                </Response>"""
-                echo_url = "https://twimlets.com/echo?Twiml=" + urllib.parse.quote(ivr_xml)
+                if public_base:
+                    # Serve directly through live FastAPI webhook via ngrok tunnel
+                    call_url = f"{public_base}/voice/twiml-ivr/{app.id}?lang={req.language}"
+                else:
+                    ivr_xml = f"""<Response>
+                        <Gather numDigits="1" timeout="10" action="https://twimlets.com/echo?Twiml=%3CResponse%3E%3CSay%20voice%3D%22alice%22%20language%3D%22en-IN%22%3EThank%20you.%20Your%20touchtone%20response%20has%20been%20registered%20on%20SlotSure.%20Goodbye.%3C%2FSay%3E%3C%2FResponse%3E">
+                            <Say voice="alice" language="en-IN">{script}</Say>
+                        </Gather>
+                        <Say voice="alice" language="en-IN">We did not receive any keypress. Please call clinic reception back. Goodbye.</Say>
+                    </Response>"""
+                    call_url = "https://twimlets.com/echo?Twiml=" + urllib.parse.quote(ivr_xml)
 
-                # Create actual outbound Twilio call using url parameter (works on all Twilio trial & paid accounts)
+                # Create actual outbound Twilio call using verified public URL
                 call = twilio_client.calls.create(
                     to=to_number,
                     from_=twilio_from,
-                    url=echo_url
+                    url=call_url
                 )
                 call_sid = call.sid
                 twilio_dispatched = True
