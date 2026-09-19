@@ -72,10 +72,12 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
 
   // Initialize phone number and load saved Twilio config
   useEffect(() => {
-    if (appointment?.patient?.phone) {
-      setPhoneNumber(appointment.patient.phone);
+    // If patient has a phone number, clean it; otherwise default to verified number
+    if (appointment?.patient?.phone && appointment.patient.phone.trim() !== '') {
+      const cleaned = appointment.patient.phone.replace(/[^\d+]/g, '');
+      setPhoneNumber(cleaned || '+917027635901');
     } else {
-      setPhoneNumber('+91 98765 43210');
+      setPhoneNumber('+917027635901');
     }
     setCallState('IDLE');
     setCallTimer(0);
@@ -158,6 +160,25 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
   // Trigger outbound call
   const handleStartCall = async () => {
     if (!appointment) return;
+
+    // Strict E.164 normalization: strip whitespace, hyphens, and parenthesis
+    const cleanDigits = phoneNumber.replace(/[^\d+]/g, '');
+    let normalizedNumber = cleanDigits;
+    if (!normalizedNumber.startsWith('+')) {
+      if (normalizedNumber.length === 10) {
+        normalizedNumber = `+91${normalizedNumber}`;
+      } else {
+        normalizedNumber = `+${normalizedNumber}`;
+      }
+    }
+
+    if (!normalizedNumber || normalizedNumber.length < 8) {
+      showToast('Please enter a valid mobile number with country code (e.g. +917027635901)', 'error');
+      return;
+    }
+
+    // Update state to normalized representation
+    setPhoneNumber(normalizedNumber);
     setCallState('RINGING');
     setCallTimer(0);
     setTwilioError(null);
@@ -166,7 +187,7 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
     try {
       const resp = await api.initiateOutboundCall({
         appointment_id: appointment.id,
-        phone_number: phoneNumber,
+        phone_number: normalizedNumber,
         mode: callMode,
         language: callLanguage,
         twilio_sid: twilioSid || undefined,
@@ -177,13 +198,17 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
       setCallSid(resp.call_sid);
       setActiveScript(resp.script);
 
-      if (resp.twilio_error) {
-        setTwilioError(resp.twilio_error);
-      }
+      if (callMode === 'twilio') {
+        if (resp.twilio_error || !resp.twilio_dispatched) {
+          // If Twilio failed, stay in IDLE and do NOT trigger fake audio demo
+          setTwilioError(resp.twilio_error || 'Twilio failed to dispatch call.');
+          setCallState('IDLE');
+          showToast(resp.twilio_error || 'Failed to dispatch cellular call', 'error');
+          return;
+        }
 
-      if (resp.twilio_dispatched) {
         setTwilioDispatchedSuccess(true);
-        showToast(`📞 Outbound call dispatched to your mobile ${phoneNumber}!`, 'success');
+        showToast(`📞 Dialing your mobile ${normalizedNumber}! Pick up your phone.`, 'success');
       }
 
       // Connect call state
@@ -194,11 +219,12 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
           setCallTimer(prev => prev + 1);
         }, 1000);
 
-        // Speak the professional IVR prompt in simulator/preview mode
-        if (callMode === 'simulator' || !resp.twilio_dispatched) {
+        // ONLY speak via browser speakers in simulator demo mode
+        // For real Twilio calls, Twilio speaks through the physical phone's earpiece/speaker!
+        if (callMode === 'simulator') {
           speakIVR(resp.script, callLanguage);
         }
-      }, 2000);
+      }, 1500);
 
     } catch (err: any) {
       showToast(err.message || 'Failed to dispatch outbound call', 'error');
@@ -473,14 +499,23 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
               <div>
                 <div className="flex items-center justify-between mb-1.5">
                   <label className="text-[11px] font-medium uppercase tracking-wider text-white/50">
-                    Destination Mobile Number (Type Your Own Mobile)
+                    Destination Mobile Number
                   </label>
-                  {callMode === 'twilio' && isTwilioConfigured && (
-                    <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
-                      Twilio Cellular Ready
-                    </span>
-                  )}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setPhoneNumber('+917027635901')}
+                      className="text-[10px] text-blue-400 hover:text-blue-300 font-mono underline cursor-pointer"
+                    >
+                      Use Verified Phone (+917027635901)
+                    </button>
+                    {callMode === 'twilio' && isTwilioConfigured && (
+                      <span className="text-[10px] text-emerald-400 font-semibold flex items-center gap-1">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
+                        Twilio Cellular Ready
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <input
@@ -559,7 +594,7 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
                   <div className="font-semibold">Twilio Cellular Notice:</div>
                   <p className="text-[11px] opacity-90">{twilioError}</p>
                   <p className="text-[10px] text-amber-300/80">
-                    Tip: On free trial Twilio accounts, you must verify your number in Twilio Console → "Verified Caller IDs" before calling it. In the meantime, you can also use "Interactive Audio Call" mode!
+                    Tip: On free trial Twilio accounts, your number must be formatted in E.164 (e.g. +917027635901) and added to Twilio Console → "Verified Caller IDs".
                   </p>
                 </div>
               </div>
@@ -585,9 +620,6 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
                       : `Initiate AI Confirmation Call to ${phoneNumber}`}
                   </span>
                 </button>
-                <p className="text-[11px] text-center text-white/40 mt-2">
-                  Speaks clinical missed visit advisory & enables Touchtone Confirmation (Buttons 1 & 2)
-                </p>
               </div>
             )}
 
@@ -626,7 +658,7 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
                   </div>
                   <div className="text-[10px] font-mono text-emerald-400 flex items-center gap-1">
                     <Volume2 className="h-3 w-3 animate-pulse" />
-                    <span>IVR Speaking Prompt</span>
+                    <span>{callMode === 'twilio' ? 'Speaking on Physical Mobile' : 'IVR Speaking Prompt'}</span>
                   </div>
                 </div>
 

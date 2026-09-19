@@ -440,6 +440,18 @@ def initiate_outbound_call(req: OutboundCallRequest, db: Session = Depends(get_d
     twilio_token = (req.twilio_token or os.getenv("TWILIO_AUTH_TOKEN", "")).strip()
     twilio_from = (req.twilio_from or os.getenv("TWILIO_PHONE_NUMBER", "")).strip()
 
+    # Strict E.164 sanitization (Twilio rejects phone numbers with spaces or dashes for trial accounts)
+    raw_to = re.sub(r"[^\d+]", "", req.phone_number.strip())
+    if not raw_to.startswith("+"):
+        if raw_to.startswith("91") and len(raw_to) == 12:
+            to_number = "+" + raw_to
+        elif len(raw_to) == 10:
+            to_number = "+91" + raw_to
+        else:
+            to_number = "+" + raw_to
+    else:
+        to_number = raw_to
+
     if req.mode == "twilio":
         if not (twilio_sid and twilio_token and twilio_from):
             twilio_error = "Missing Twilio credentials. Please enter Account SID, Auth Token, and Twilio Phone Number in the settings panel."
@@ -459,14 +471,15 @@ def initiate_outbound_call(req: OutboundCallRequest, db: Session = Depends(get_d
 
                 # Create actual outbound Twilio call using url parameter (works on all Twilio trial & paid accounts)
                 call = twilio_client.calls.create(
-                    to=req.phone_number,
+                    to=to_number,
                     from_=twilio_from,
                     url=echo_url
                 )
                 call_sid = call.sid
                 twilio_dispatched = True
             except Exception as e:
-                twilio_error = str(e)
+                clean_err = re.sub(r'\x1b\[[0-9;]*m', '', str(e)).strip()
+                twilio_error = clean_err
 
     return {
         "call_sid": call_sid,
@@ -477,7 +490,7 @@ def initiate_outbound_call(req: OutboundCallRequest, db: Session = Depends(get_d
         "department": app.department,
         "appointment_date": app.appointment_date,
         "appointment_time": app.appointment_time,
-        "phone_number": req.phone_number,
+        "phone_number": to_number if req.mode == "twilio" else req.phone_number,
         "missed_appointments_count": missed_count,
         "script": script,
         "twilio_dispatched": twilio_dispatched,
