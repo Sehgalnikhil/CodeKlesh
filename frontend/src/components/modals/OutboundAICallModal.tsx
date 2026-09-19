@@ -455,11 +455,14 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
                 <PhoneForwarded className="h-4 w-4" />
               </div>
               <div>
-                <h3 className="text-base font-bold text-white tracking-tight">
-                  Outbound AI Confirmation Call
+                <h3 className="text-base font-bold text-white tracking-tight flex items-center gap-2">
+                  <span>SlotSure Conversational AI Call</span>
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">
+                    Live Interactive AI
+                  </span>
                 </h3>
                 <p className="text-[11px] text-white/50">
-                  IVR Touchtone Confirmation (Buttons 1 & 2)
+                  Real-Time Spoken Dialogue & Mobile Touchtone Sync
                 </p>
               </div>
             </div>
@@ -781,12 +784,20 @@ export const OutboundAICallModal: React.FC<OutboundAICallModalProps> = ({
                   <p className="italic">"{activeScript}"</p>
                 </div>
 
+                {/* Conversational AI & Touchtone Instructions */}
+                <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/25 text-xs flex items-center gap-2.5 text-blue-200">
+                  <Sparkles className="h-4 w-4 text-blue-400 shrink-0 animate-pulse" />
+                  <span className="text-[11px] leading-relaxed">
+                    <strong>Conversational AI Listening:</strong> You can speak naturally into your mobile phone (e.g. <em>"Yes, confirm it"</em>, <em>"Who is my doctor?"</em>, or <em>"Cancel my visit"</em>) or use your keypad below.
+                  </span>
+                </div>
+
                 {/* Touchtone Interactive Buttons (Key 1 & Key 2) */}
                 <div>
                   <div className="text-[11px] font-semibold uppercase tracking-wider text-white/50 mb-2 flex items-center justify-between">
-                    <span>Touchtone Response (Buttons 1 & 2):</span>
+                    <span>Touchtone Response (Optional):</span>
                     <span className="text-emerald-400 font-sans normal-case text-xs">
-                      Press 1 on your phone or tap below
+                      Press 1 or speak into your phone
                     </span>
                   </div>
 

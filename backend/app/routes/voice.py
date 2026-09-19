@@ -449,19 +449,50 @@ def twiml_ivr_endpoint(appointment_id: int, request: Request, lang: Optional[str
     base_url = get_public_base_url() or ""
     action_url = f"{base_url}/voice/twiml-action/{appointment_id}"
 
+    if lang == "hi":
+        missed_clause = f"Hamare clinical records ke mutabiq aapka pichhla {missed_count} appointment miss hua tha. " if missed_count > 0 else ""
+        prompt_text = (
+            f"Namaste {patient.first_name if patient else ''} ji. Yeh SlotSure Healthcare se SlotSure AI automated priority confirmation call hai. "
+            f"Aapka appointment {app.doctor_name} ke sath {app.department} mein {readable_date} ko {app.appointment_time} baje scheduled hai. "
+            f"{missed_clause}"
+            f"Aap mujhse seedhe bol kar baat kar sakte hain. Kya aap aana chahte hain aur appointment confirm karna chahte hain, ya cancel karna chahte hain?"
+        )
+        voice_tag = '<Say voice="alice" language="hi-IN">'
+        listen_lang = "hi-IN"
+    else:
+        if missed_count == 1:
+            missed_clause = "Our clinic records note 1 previously missed visit. "
+        elif missed_count > 1:
+            missed_clause = f"Our clinic records note {missed_count} previously missed visits. "
+        else:
+            missed_clause = "To protect clinic capacity and doctor availability, "
+
+        prompt_text = (
+            f"Hello {patient.first_name if patient else ''}, this is an automated priority confirmation call from SlotSure Healthcare "
+            f"regarding your upcoming appointment with {app.doctor_name} in {app.department} on {readable_date} at {app.appointment_time}. "
+            f"{missed_clause}"
+            f"I am your live SlotSure AI healthcare assistant. You can speak to me naturally right now to confirm, cancel, or ask any questions about your visit. How can I help you today?"
+        )
+        voice_tag = '<Say voice="alice" language="en-IN">'
+        listen_lang = "en-IN"
+
     xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Gather numDigits="1" action="{action_url}" method="POST" timeout="12">
+    <Gather input="speech dtmf" timeout="5" speechTimeout="auto" language="{listen_lang}" action="{action_url}" method="POST">
         {voice_tag}{prompt_text}</Say>
     </Gather>
-    {voice_tag}We did not receive any keypress. Please call clinic reception back if you need assistance. Goodbye.</Say>
+    <Gather input="speech dtmf" timeout="5" speechTimeout="auto" language="{listen_lang}" action="{action_url}" method="POST">
+        {voice_tag}I am still here. Please speak to confirm or cancel your visit, or press 1 to confirm, or press 2 to cancel.</Say>
+    </Gather>
+    {voice_tag}Thank you for contacting SlotSure Healthcare. Have a great day and goodbye.</Say>
 </Response>"""
     return Response(content=xml, media_type="application/xml")
 
 @router.api_route("/twiml-action/{appointment_id}", methods=["GET", "POST"])
 async def twiml_action_endpoint(appointment_id: int, request: Request, db: Session = Depends(get_db)):
     form_data = await request.form()
-    digits = form_data.get("Digits", "")
+    digits = form_data.get("Digits", "").strip()
+    speech = form_data.get("SpeechResult", "").strip()
     call_sid = form_data.get("CallSid", "")
     from_number = form_data.get("From", "")
 
@@ -469,31 +500,70 @@ async def twiml_action_endpoint(appointment_id: int, request: Request, db: Sessi
     if not app:
         return Response(content='<?xml version="1.0" encoding="UTF-8"?><Response><Say voice="alice" language="en-IN">Appointment not found. Goodbye.</Say></Response>', media_type="application/xml")
 
+    patient = app.patient
+    patient_name = patient.first_name if patient else "there"
+
+    try:
+        dt = datetime.strptime(app.appointment_date, "%Y-%m-%d")
+        readable_date = dt.strftime("%A, %B %d")
+    except Exception:
+        readable_date = app.appointment_date
+
+    base_url = get_public_base_url() or ""
+    action_url = f"{base_url}/voice/twiml-action/{appointment_id}"
+
     from ..models import SlotRecovery
-    outcome_str = "COMPLETED_NO_KEY"
-    if digits == "1":
+    outcome_str = "IN_CALL"
+    speech_lower = speech.lower()
+
+    # 1. Spoken confirmation OR Touchtone 1
+    confirm_tokens = ["confirm", "yes", "i will come", "sure", "attend", "coming", "theek hai", "haan", "ha", "yep", "correct", "definitely", "schedule", "keep", "fine"]
+    is_confirmed = (digits == "1") or any(k in speech_lower for k in confirm_tokens)
+
+    # 2. Spoken cancellation OR Touchtone 2
+    cancel_tokens = ["cancel", "not come", "cannot come", "can't come", "can't make it", "release", "reschedule", "nahi", "no", "won't come", "drop", "delete"]
+    is_cancelled = (digits == "2") or any(k in speech_lower for k in cancel_tokens)
+
+    if is_confirmed and not is_cancelled:
         outcome_str = "CONFIRMED"
         app.confirmation_status = "Confirmed"
         app.recovery_status = "Normal"
-        app.notes = (app.notes or "") + f" [Twilio Phone DTMF Key 1: Confirmed via Phone Call {call_sid}]"
+        method_desc = f"Spoken AI speech: '{speech}'" if speech else f"DTMF Key 1"
+        app.notes = (app.notes or "") + f" [SlotSure AI Call: Confirmed via {method_desc} ({call_sid})]"
         rec = db.query(SlotRecovery).filter(SlotRecovery.appointment_id == app.id, SlotRecovery.status == "Proposed").first()
         if rec:
             rec.status = "Dismissed"
         db.commit()
-        reply_xml = """<?xml version="1.0" encoding="UTF-8"?>
+
+        if call_sid:
+            session = ACTIVE_CALL_SESSIONS.get(call_sid) or {}
+            session.update({
+                "call_sid": call_sid,
+                "appointment_id": appointment_id,
+                "status": "COMPLETED",
+                "digits_pressed": "1",
+                "speech_heard": speech,
+                "outcome": "CONFIRMED"
+            })
+            ACTIVE_CALL_SESSIONS[call_sid] = session
+
+        reply_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Say voice="alice" language="en-IN">Thank you! Your attendance has been confirmed on SlotSure. Your reserved slot is fully secured. Have a wonderful day. Goodbye.</Say>
+    <Say voice="alice" language="en-IN">Wonderful, {patient_name}! Your appointment with {app.doctor_name} on {readable_date} at {app.appointment_time} is now fully confirmed on SlotSure. Your reserved slot is secured. Have a wonderful day. Goodbye.</Say>
 </Response>"""
-    elif digits == "2":
+        return Response(content=reply_xml, media_type="application/xml")
+
+    elif is_cancelled:
         outcome_str = "CANCELLED"
         app.confirmation_status = "Cancelled"
         app.recovery_status = "Action Required"
-        app.notes = (app.notes or "") + f" [Twilio Phone DTMF Key 2: Cancelled via Phone Call {call_sid}]"
+        method_desc = f"Spoken AI speech: '{speech}'" if speech else f"DTMF Key 2"
+        app.notes = (app.notes or "") + f" [SlotSure AI Call: Cancelled via {method_desc} ({call_sid})]"
         rec = db.query(SlotRecovery).filter(SlotRecovery.appointment_id == app.id).first()
         if not rec:
             rec = SlotRecovery(
                 appointment_id=app.id,
-                trigger_reason="Patient touchtone cancellation via AI cellular call (Key 2)",
+                trigger_reason=f"Patient touchtone/voice cancellation via SlotSure AI: {speech or 'Key 2'}",
                 status="Active",
                 recovery_plan="Queue waitlist match and trigger outreach"
             )
@@ -501,28 +571,48 @@ async def twiml_action_endpoint(appointment_id: int, request: Request, db: Sessi
         else:
             rec.status = "Active"
         db.commit()
-        reply_xml = """<?xml version="1.0" encoding="UTF-8"?>
+
+        if call_sid:
+            session = ACTIVE_CALL_SESSIONS.get(call_sid) or {}
+            session.update({
+                "call_sid": call_sid,
+                "appointment_id": appointment_id,
+                "status": "COMPLETED",
+                "digits_pressed": "2",
+                "speech_heard": speech,
+                "outcome": "CANCELLED"
+            })
+            ACTIVE_CALL_SESSIONS[call_sid] = session
+
+        reply_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Say voice="alice" language="en-IN">Your appointment has been cancelled and the slot is released for standby patients. Thank you for notifying SlotSure. Goodbye.</Say>
+    <Say voice="alice" language="en-IN">Understood, {patient_name}. Your appointment has been cancelled and your slot has been released for standby patients on our waitlist. Thank you for notifying SlotSure. Goodbye.</Say>
 </Response>"""
+        return Response(content=reply_xml, media_type="application/xml")
+
+    # 3. Interactive conversational questions
+    elif any(w in speech_lower for w in ["doctor", "who", "whom"]):
+        conversational_reply = f"You are scheduled to see {app.doctor_name} in the {app.department} department. Would you like me to confirm this visit, or do you need to cancel it?"
+    elif any(w in speech_lower for w in ["time", "when", "date", "day", "timing"]):
+        conversational_reply = f"Your appointment is set for {readable_date} at {app.appointment_time}. Would you like to confirm your attendance?"
+    elif any(w in speech_lower for w in ["miss", "prior", "previous", "record"]):
+        missed_count = patient.missed_appointments if patient else 0
+        conversational_reply = f"Our hospital records note {missed_count} previously missed visits, which is why SlotSure AI is verifying attendance in advance. Should I confirm your slot now?"
+    elif any(w in speech_lower for w in ["hello", "hi", "hey"]):
+        conversational_reply = f"Hello {patient_name}! I am SlotSure AI. I am calling to confirm your appointment with {app.doctor_name} on {readable_date} at {app.appointment_time}. Would you like to confirm your visit?"
+    elif speech:
+        conversational_reply = f"I heard you say: '{speech}'. As your SlotSure AI assistant, you can say 'confirm' to lock your slot, say 'cancel' to release it, or ask about your doctor or time. What would you like to do?"
     else:
-        reply_xml = """<?xml version="1.0" encoding="UTF-8"?>
+        conversational_reply = f"I didn't hear a response. To confirm your visit with {app.doctor_name}, you can say 'confirm' or press 1. To cancel, say 'cancel' or press 2."
+
+    # Return interactive conversational loop
+    reply_xml = f"""<?xml version="1.0" encoding="UTF-8"?>
 <Response>
-    <Say voice="alice" language="en-IN">Thank you for contacting SlotSure Healthcare. Goodbye.</Say>
+    <Gather input="speech dtmf" timeout="5" speechTimeout="auto" language="en-IN" action="{action_url}" method="POST">
+        <Say voice="alice" language="en-IN">{conversational_reply}</Say>
+    </Gather>
+    <Say voice="alice" language="en-IN">Thank you for speaking with SlotSure AI Healthcare. Have a pleasant day. Goodbye.</Say>
 </Response>"""
-
-    # Record in active sessions
-    if call_sid:
-        session = ACTIVE_CALL_SESSIONS.get(call_sid) or {}
-        session.update({
-            "call_sid": call_sid,
-            "appointment_id": appointment_id,
-            "status": "COMPLETED",
-            "digits_pressed": digits,
-            "outcome": outcome_str
-        })
-        ACTIVE_CALL_SESSIONS[call_sid] = session
-
     return Response(content=reply_xml, media_type="application/xml")
 
 @router.api_route("/twiml-status/{appointment_id}", methods=["GET", "POST"])
