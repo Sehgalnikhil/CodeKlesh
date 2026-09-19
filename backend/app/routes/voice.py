@@ -334,3 +334,206 @@ def voice_ai_dialogue(req: VoiceDialogueRequest, db: Session = Depends(get_db)):
         "pending_slot": None,
         "booked_appointment": None
     }
+
+
+# ==========================================
+# OUTBOUND AI PHONE CALL CONFIRMATION & IVR
+# ==========================================
+
+class OutboundCallRequest(BaseModel):
+    appointment_id: int
+    phone_number: str
+    mode: Optional[str] = "simulator" # "simulator" or "twilio"
+    language: Optional[str] = "en"    # "en" or "hi"
+
+class RecordCallResultRequest(BaseModel):
+    appointment_id: int
+    phone_number: str
+    digits_pressed: str # "1" or "2"
+    duration_seconds: int
+    notes: Optional[str] = None
+
+@router.post("/outbound-call")
+def initiate_outbound_call(req: OutboundCallRequest, db: Session = Depends(get_db)):
+    app = db.query(Appointment).filter(Appointment.id == req.appointment_id).first()
+    if not app:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+        
+    patient = app.patient
+    if not patient:
+        patient = db.query(Patient).filter(Patient.id == app.patient_id).first()
+
+    patient_name = f"{patient.first_name} {patient.last_name}" if patient else "Patient"
+    missed_count = patient.missed_appointments if patient else 0
+    
+    # Format readable appointment date
+    try:
+        readable_date = datetime.strptime(app.appointment_date, "%Y-%m-%d").strftime("%A, %B %d")
+    except Exception:
+        readable_date = app.appointment_date
+
+    # Prepare professional clinical script incorporating previous missed appointments
+    if req.language == "hi":
+        if missed_count > 0:
+            missed_clause = f"Hamare clinical records ke mutabiq aapka pichhla {missed_count} appointment miss hua tha. "
+        else:
+            missed_clause = ""
+        script = (
+            f"Namaste {patient.first_name if patient else ''} ji. Yeh SlotSure Clinic se ek automated priority confirmation call hai. "
+            f"Aapka aane wala appointment {app.doctor_name} ke sath {app.department} mein {readable_date} ko {app.appointment_time} baje scheduled hai. "
+            f"{missed_clause}"
+            f"Apne reserved slot ko surakshit karne aur aane ki pushti ke liye, kripya 1 dabayein. "
+            f"Yadi aap nahi aa sakte aur slot cancel karna chahte hain, toh kripya 2 dabayein."
+        )
+    else:
+        if missed_count == 1:
+            missed_clause = "Our clinic records note 1 previously missed visit. "
+        elif missed_count > 1:
+            missed_clause = f"Our clinic records note {missed_count} previously missed visits. "
+        else:
+            missed_clause = "To ensure proper clinical capacity and doctor availability, "
+            
+        script = (
+            f"Hello {patient.first_name if patient else ''}, this is an automated priority confirmation call from SlotSure Healthcare "
+            f"regarding your upcoming appointment with {app.doctor_name} in {app.department} on {readable_date} at {app.appointment_time}. "
+            f"{missed_clause}"
+            f"To protect your reserved slot and confirm your attendance, please press 1. "
+            f"If you are unable to attend and need to release this slot for an urgent patient, please press 2."
+        )
+
+    import uuid
+    import os
+    call_sid = f"CA-{uuid.uuid4().hex[:12]}"
+    twilio_dispatched = False
+    twilio_error = None
+
+    # Check if Twilio is requested and configured
+    twilio_sid = os.getenv("TWILIO_ACCOUNT_SID")
+    twilio_token = os.getenv("TWILIO_AUTH_TOKEN")
+    twilio_from = os.getenv("TWILIO_PHONE_NUMBER")
+
+    if req.mode == "twilio" and twilio_sid and twilio_token and twilio_from:
+        try:
+            from twilio.rest import Client
+            twilio_client = Client(twilio_sid, twilio_token)
+            # Create outbound Twilio call
+            # Note: in real deployment, url points to public ngrok/domain /voice/twiml-ivr
+            call = twilio_client.calls.create(
+                to=req.phone_number,
+                from_=twilio_from,
+                twiml=f"""<Response>
+                    <Gather numDigits="1" timeout="10" action="/voice/twiml-handle-key?appointment_id={app.id}">
+                        <Say voice="Polly.Aditi" language="en-IN">{script}</Say>
+                    </Gather>
+                    <Say voice="Polly.Aditi" language="en-IN">We did not receive any keypress. Please call the clinic reception back. Goodbye.</Say>
+                </Response>"""
+            )
+            call_sid = call.sid
+            twilio_dispatched = True
+        except Exception as e:
+            twilio_error = str(e)
+
+    return {
+        "call_sid": call_sid,
+        "status": "INITIATED",
+        "appointment_id": app.id,
+        "patient_name": patient_name,
+        "doctor_name": app.doctor_name,
+        "department": app.department,
+        "appointment_date": app.appointment_date,
+        "appointment_time": app.appointment_time,
+        "phone_number": req.phone_number,
+        "missed_appointments_count": missed_count,
+        "script": script,
+        "twilio_dispatched": twilio_dispatched,
+        "twilio_error": twilio_error,
+        "mode": req.mode
+    }
+
+@router.post("/record-call-result")
+def record_call_result(req: RecordCallResultRequest, db: Session = Depends(get_db)):
+    app = db.query(Appointment).filter(Appointment.id == req.appointment_id).first()
+    if not app:
+        raise HTTPException(status_code=404, detail="Appointment not found")
+
+    from ..models import SlotRecovery
+    patient = app.patient
+
+    if req.digits_pressed == "1":
+        # Confirmed Attendance
+        app.confirmation_status = "Confirmed"
+        app.recovery_status = "Normal"
+        note_text = f" [AI Phone Call to {req.phone_number}: Confirmed via Key 1 ({req.duration_seconds}s)]"
+        app.notes = (app.notes or "") + note_text
+        
+        # Dismiss any proposed recovery
+        rec = db.query(SlotRecovery).filter(
+            SlotRecovery.appointment_id == app.id,
+            SlotRecovery.status == "Proposed"
+        ).first()
+        if rec:
+            rec.status = "Dismissed"
+
+        outcome = "CONFIRMED"
+        outcome_label = "Attendance Confirmed (Key 1 Pressed)"
+        spoken_response = f"Thank you! Your attendance with {app.doctor_name} has been confirmed. We look forward to seeing you. Goodbye."
+        capacity_action = "Capacity Secured"
+        revenue_protected = 3500
+
+    elif req.digits_pressed == "2":
+        # Cancelled & Slot Freed for Recovery
+        app.confirmation_status = "Cancelled"
+        app.recovery_status = "At_Risk"
+        note_text = f" [AI Phone Call to {req.phone_number}: Cancelled via Key 2 ({req.duration_seconds}s)]"
+        app.notes = (app.notes or "") + note_text
+
+        # Create or update slot recovery item
+        existing_rec = db.query(SlotRecovery).filter(SlotRecovery.appointment_id == app.id).first()
+        if not existing_rec:
+            new_rec = SlotRecovery(
+                appointment_id=app.id,
+                doctor_name=app.doctor_name,
+                department=app.department,
+                slot_time=f"{app.appointment_date} {app.appointment_time}",
+                risk_level="HIGH",
+                recommended_strategy="Backfill from Waitlist",
+                revenue_at_risk=3500,
+                status="Proposed"
+            )
+            db.add(new_rec)
+
+        outcome = "CANCELLED_FREED"
+        outcome_label = "Slot Released for Recovery (Key 2 Pressed)"
+        spoken_response = "Your appointment has been cancelled and the slot has been released for an urgent patient. If you need to reschedule, please call clinic reception. Goodbye."
+        capacity_action = "Slot Released to Recovery Queue"
+        revenue_protected = 0
+
+    else:
+        outcome = "NO_RESPONSE"
+        outcome_label = "No Valid Key Pressed"
+        spoken_response = "We did not receive a valid touchtone response. Clinic staff will follow up."
+        capacity_action = "Requires Manual Followup"
+        revenue_protected = 0
+
+    db.commit()
+    db.refresh(app)
+
+    return {
+        "success": True,
+        "outcome": outcome,
+        "outcome_label": outcome_label,
+        "spoken_response": spoken_response,
+        "appointment_id": app.id,
+        "patient_name": f"{patient.first_name} {patient.last_name}" if patient else "Patient",
+        "doctor_name": app.doctor_name,
+        "department": app.department,
+        "confirmation_status": app.confirmation_status,
+        "recovery_status": app.recovery_status,
+        "phone_number": req.phone_number,
+        "digits_pressed": req.digits_pressed,
+        "duration_seconds": req.duration_seconds,
+        "capacity_action": capacity_action,
+        "revenue_protected": revenue_protected,
+        "timestamp": datetime.now().strftime("%I:%M %p")
+    }
+

@@ -9,7 +9,8 @@ import {
   Command,
   X,
   Smartphone,
-  PhoneCall
+  PhoneCall,
+  PhoneForwarded
 } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
@@ -22,6 +23,7 @@ interface NavbarProps {
   onOpenSpotlight: () => void;
   onOpenMobileSimulator?: () => void;
   onOpenVoiceCall?: () => void;
+  onOpenOutboundCall?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
@@ -33,6 +35,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenSpotlight,
   onOpenMobileSimulator,
   onOpenVoiceCall,
+  onOpenOutboundCall,
 }) => {
   const { user, darkMode, toggleDarkMode } = useAuth();
   const [showNotifications, setShowNotifications] = useState(false);
@@ -111,6 +114,18 @@ export const Navbar: React.FC<NavbarProps> = ({
             >
               <PhoneCall className="h-3.5 w-3.5" />
               <span className="text-[11px]">AI Voice Desk</span>
+            </button>
+          )}
+
+          {/* Outbound AI Confirmation Call Trigger */}
+          {onOpenOutboundCall && (
+            <button
+              onClick={onOpenOutboundCall}
+              className="h-8 px-3 rounded-full bg-blue-500/10 hover:bg-blue-500/15 border border-blue-500/25 text-blue-600 dark:text-blue-400 flex items-center gap-1.5 text-xs font-semibold transition-all active:scale-95 shadow-2xs"
+              title="Trigger Outbound AI Confirmation Call to Patient"
+            >
+              <PhoneForwarded className="h-3.5 w-3.5" />
+              <span className="text-[11px]">AI Outbound Call</span>
             </button>
           )}
 

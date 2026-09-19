@@ -221,4 +221,62 @@ export const api = {
       body: JSON.stringify(payload),
     });
   },
+
+  // Outbound AI Phone Calling
+  async initiateOutboundCall(payload: {
+    appointment_id: number;
+    phone_number: string;
+    mode?: 'simulator' | 'twilio';
+    language?: 'en' | 'hi';
+  }): Promise<{
+    call_sid: string;
+    status: string;
+    appointment_id: number;
+    patient_name: string;
+    doctor_name: string;
+    department: string;
+    appointment_date: string;
+    appointment_time: string;
+    phone_number: string;
+    missed_appointments_count: number;
+    script: string;
+    twilio_dispatched: boolean;
+    twilio_error?: string;
+    mode: string;
+  }> {
+    return request('/voice/outbound-call', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async recordCallResult(payload: {
+    appointment_id: number;
+    phone_number: string;
+    digits_pressed: '1' | '2';
+    duration_seconds: number;
+    notes?: string;
+  }): Promise<{
+    success: boolean;
+    outcome: 'CONFIRMED' | 'CANCELLED_FREED' | 'NO_RESPONSE';
+    outcome_label: string;
+    spoken_response: string;
+    appointment_id: number;
+    patient_name: string;
+    doctor_name: string;
+    department: string;
+    confirmation_status: string;
+    recovery_status: string;
+    phone_number: string;
+    digits_pressed: string;
+    duration_seconds: number;
+    capacity_action: string;
+    revenue_protected: number;
+    timestamp: string;
+  }> {
+    return request('/voice/record-call-result', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
 };

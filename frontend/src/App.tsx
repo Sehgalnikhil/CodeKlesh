@@ -26,6 +26,7 @@ import { ClinicLiveWire } from './components/ui/ClinicLiveWire';
 import { PatientMobileSimulator } from './components/modals/PatientMobileSimulator';
 import { ExecutiveROIReportModal } from './components/modals/ExecutiveROIReportModal';
 import { AIVoiceCallingModal } from './components/modals/AIVoiceCallingModal';
+import { OutboundAICallModal } from './components/modals/OutboundAICallModal';
 
 const MainAppContent: React.FC = () => {
   const { showToast } = useAuth();
@@ -44,6 +45,8 @@ const MainAppContent: React.FC = () => {
   const [isMobileSimulatorOpen, setIsMobileSimulatorOpen] = useState(false);
   const [isROIReportOpen, setIsROIReportOpen] = useState(false);
   const [isVoiceCallOpen, setIsVoiceCallOpen] = useState(false);
+  const [isOutboundCallOpen, setIsOutboundCallOpen] = useState(false);
+  const [outboundAppointment, setOutboundAppointment] = useState<Appointment | null>(null);
 
   // Data States
   const [appointments, setAppointments] = useState<Appointment[]>([]);
@@ -189,6 +192,11 @@ const MainAppContent: React.FC = () => {
           onOpenSpotlight={() => setIsSpotlightOpen(true)}
           onOpenMobileSimulator={() => setIsMobileSimulatorOpen(true)}
           onOpenVoiceCall={() => setIsVoiceCallOpen(true)}
+          onOpenOutboundCall={() => {
+            const highRisk = appointments.find(a => a.prediction?.risk_level === 'HIGH' && a.confirmation_status !== 'Confirmed');
+            setOutboundAppointment(highRisk || appointments[0] || null);
+            setIsOutboundCallOpen(true);
+          }}
         />
 
         {/* Dynamic Page Views */}
@@ -273,6 +281,10 @@ const MainAppContent: React.FC = () => {
         }}
         onViewPatientDirectory={handleViewPatientInDirectory}
         onRefreshData={loadAllData}
+        onOpenOutboundCall={app => {
+          setOutboundAppointment(app);
+          setIsOutboundCallOpen(true);
+        }}
       />
 
       {/* Reminder Modal */}
@@ -365,6 +377,17 @@ const MainAppContent: React.FC = () => {
         isOpen={isVoiceCallOpen}
         onClose={() => setIsVoiceCallOpen(false)}
         onAppointmentBooked={loadAllData}
+      />
+
+      {/* Outbound AI Confirmation Call Modal */}
+      <OutboundAICallModal
+        isOpen={isOutboundCallOpen}
+        onClose={() => {
+          setIsOutboundCallOpen(false);
+          setOutboundAppointment(null);
+        }}
+        appointment={outboundAppointment}
+        onRefreshData={loadAllData}
       />
 
       {/* Global Toast Container */}

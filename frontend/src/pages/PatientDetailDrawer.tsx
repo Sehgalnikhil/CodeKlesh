@@ -11,6 +11,7 @@ import {
   ArrowRight,
   TrendingDown,
   PhoneCall,
+  PhoneForwarded,
   CheckCircle2,
   Stethoscope,
   Building2,
@@ -32,6 +33,7 @@ interface PatientDetailDrawerProps {
   onNavigateToRecovery: () => void;
   onViewPatientDirectory: (patientId: number) => void;
   onRefreshData: () => void;
+  onOpenOutboundCall?: (app: Appointment) => void;
 }
 
 export const PatientDetailDrawer: React.FC<PatientDetailDrawerProps> = ({
@@ -42,6 +44,7 @@ export const PatientDetailDrawer: React.FC<PatientDetailDrawerProps> = ({
   onNavigateToRecovery,
   onViewPatientDirectory,
   onRefreshData,
+  onOpenOutboundCall,
 }) => {
   const { showToast } = useAuth();
   const { emitEvent } = useActivityStream();
@@ -469,17 +472,28 @@ export const PatientDetailDrawer: React.FC<PatientDetailDrawerProps> = ({
                       <span className="text-[10px] text-[#6B6B6F]">Reception desk verbal triage</span>
                     </div>
                   </div>
-                  {callQueued ? (
-                    <span className="text-[10px] text-[#4F8A70] font-semibold">✓ Queued</span>
-                  ) : (
-                    <button
-                      disabled={isQueuingCall}
-                      onClick={handleQueueStaffCall}
-                      className="px-2.5 py-1 bg-[#1D1D1F] dark:bg-white text-white dark:text-[#1D1D1F] rounded-lg text-[10px] font-medium hover:bg-[#2C2C2E] transition-all disabled:opacity-50"
-                    >
-                      {isQueuingCall ? 'Queuing...' : 'Queue Call'}
-                    </button>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {onOpenOutboundCall && (
+                      <button
+                        onClick={() => onOpenOutboundCall(appointment)}
+                        className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[10px] font-semibold transition-all flex items-center gap-1 shadow-xs active:scale-95"
+                      >
+                        <PhoneForwarded className="h-3 w-3" />
+                        <span>AI Call Now</span>
+                      </button>
+                    )}
+                    {callQueued ? (
+                      <span className="text-[10px] text-[#4F8A70] font-semibold">✓ Queued</span>
+                    ) : (
+                      <button
+                        disabled={isQueuingCall}
+                        onClick={handleQueueStaffCall}
+                        className="px-2.5 py-1 bg-[#1D1D1F] dark:bg-white text-white dark:text-[#1D1D1F] rounded-lg text-[10px] font-medium hover:bg-[#2C2C2E] transition-all disabled:opacity-50"
+                      >
+                        {isQueuingCall ? 'Queuing...' : 'Queue'}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
