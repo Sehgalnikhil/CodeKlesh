@@ -20,7 +20,8 @@ import {
   Calendar,
   Clock,
   Sparkles,
-  ChevronRight
+  ChevronRight,
+  ShieldCheck
 } from 'lucide-react';
 import { AnalyticsResponse } from '../types';
 
@@ -66,71 +67,71 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ analytics }) => {
   };
 
   const donutData = [
-    { name: 'Low Risk', value: analytics?.risk_distribution.low || 64, color: '#30D158' },
-    { name: 'Medium Risk', value: analytics?.risk_distribution.medium || 38, color: '#FF9F0A' },
-    { name: 'High Risk', value: analytics?.risk_distribution.high || 26, color: '#FF453A' },
+    { name: 'Low Risk', value: analytics?.risk_distribution.low || 64, color: '#4F8A70' },
+    { name: 'Medium Risk', value: analytics?.risk_distribution.medium || 38, color: '#C18A3A' },
+    { name: 'High Risk', value: analytics?.risk_distribution.high || 26, color: '#C9685B' },
   ];
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300">
       {/* Title */}
       <div>
-        <span className="text-[11px] font-extrabold uppercase tracking-widest text-[#6E6E73]">
-          CLINICAL TRENDS
+        <span className="text-[11px] font-bold uppercase tracking-wider text-[#6B6B6F]">
+          Operational Trends
         </span>
-        <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[#1D1D1F] dark:text-[#F5F5F7] mt-1">
-          Capacity & Performance Analytics
+        <h1 className="text-3xl font-semibold tracking-tight text-[#1D1D1F] dark:text-white mt-1">
+          Analytics & Performance
         </h1>
-        <p className="text-sm text-[#6E6E73] mt-1">
-          Apple Health-inspired insights into attendance trends, department variance, and capacity protection.
+        <p className="text-sm text-[#6B6B6F] mt-1">
+          Comprehensive real-time metrics on attendance patterns, specialty variance, and clinical capacity.
         </p>
       </div>
 
-      {/* Apple Health Metric Badges (Model Performance) */}
-      <div className="p-6 rounded-3xl apple-card space-y-4">
+      {/* Model Performance Metrics */}
+      <div className="p-6 rounded-2xl bg-white/70 dark:bg-[#181818]/70 backdrop-blur-xl border border-white/60 dark:border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.03)] space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-black/[0.04] dark:border-white/[0.06]">
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider text-[#6E6E73]">
+            <span className="text-xs font-semibold uppercase tracking-wider text-[#6B6B6F]">
               Supervised Clinical Risk Model Benchmark
             </span>
           </div>
-          <span className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-300 bg-emerald-500/10 px-2.5 py-0.5 rounded-full border border-emerald-500/20">
+          <span className="text-[10px] font-medium text-[#4F8A70] bg-[#4F8A70]/10 px-2.5 py-0.5 rounded-full border border-[#4F8A70]/20">
             Validated Cross-Cohort
           </span>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          <div className="p-3.5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] text-center">
-            <span className="text-[10px] text-[#6E6E73] font-bold uppercase tracking-wider">Accuracy</span>
-            <div className="text-2xl font-extrabold text-[#1D1D1F] dark:text-white mt-1">
+          <div className="p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] text-center">
+            <span className="text-[10px] text-[#6B6B6F] font-semibold uppercase tracking-wider">Accuracy</span>
+            <div className="text-2xl font-semibold text-[#1D1D1F] dark:text-white mt-1">
               {Math.round(metrics.accuracy * 100)}%
             </div>
           </div>
 
-          <div className="p-3.5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] text-center">
-            <span className="text-[10px] text-[#6E6E73] font-bold uppercase tracking-wider">Precision</span>
-            <div className="text-2xl font-extrabold text-[#1D1D1F] dark:text-white mt-1">
+          <div className="p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] text-center">
+            <span className="text-[10px] text-[#6B6B6F] font-semibold uppercase tracking-wider">Precision</span>
+            <div className="text-2xl font-semibold text-[#1D1D1F] dark:text-white mt-1">
               {Math.round(metrics.precision * 100)}%
             </div>
           </div>
 
-          <div className="p-3.5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] text-center">
-            <span className="text-[10px] text-[#6E6E73] font-bold uppercase tracking-wider">Recall</span>
-            <div className="text-2xl font-extrabold text-[#1D1D1F] dark:text-white mt-1">
+          <div className="p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] text-center">
+            <span className="text-[10px] text-[#6B6B6F] font-semibold uppercase tracking-wider">Recall</span>
+            <div className="text-2xl font-semibold text-[#1D1D1F] dark:text-white mt-1">
               {Math.round(metrics.recall * 100)}%
             </div>
           </div>
 
-          <div className="p-3.5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] text-center">
-            <span className="text-[10px] text-[#6E6E73] font-bold uppercase tracking-wider">F1 Score</span>
-            <div className="text-2xl font-extrabold text-[#1D1D1F] dark:text-white mt-1">
+          <div className="p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] text-center">
+            <span className="text-[10px] text-[#6B6B6F] font-semibold uppercase tracking-wider">F1 Score</span>
+            <div className="text-2xl font-semibold text-[#1D1D1F] dark:text-white mt-1">
               {metrics.f1_score.toFixed(2)}
             </div>
           </div>
 
-          <div className="p-3.5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] text-center">
-            <span className="text-[10px] text-[#6E6E73] font-bold uppercase tracking-wider">ROC-AUC</span>
-            <div className="text-2xl font-extrabold text-brand-600 dark:text-brand-400 mt-1">
+          <div className="p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] text-center">
+            <span className="text-[10px] text-[#6B6B6F] font-semibold uppercase tracking-wider">ROC-AUC</span>
+            <div className="text-2xl font-semibold text-[#647A8A] mt-1">
               {metrics.roc_auc.toFixed(3)}
             </div>
           </div>
@@ -139,39 +140,39 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ analytics }) => {
 
       {/* Row 1: Apple Health Minimal Area Chart + Risk Donut */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Apple Health Minimal Smooth Trend (Col 1 to 8) */}
-        <div className="lg:col-span-8 p-6 sm:p-7 rounded-3xl apple-card space-y-4 flex flex-col justify-between">
+        {/* Apple Health Minimal Smooth Trend */}
+        <div className="lg:col-span-8 p-6 rounded-2xl bg-white/70 dark:bg-[#181818]/70 backdrop-blur-xl border border-white/60 dark:border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.03)] space-y-4 flex flex-col justify-between">
           <div className="flex items-center justify-between pb-3 border-b border-black/[0.04] dark:border-white/[0.06]">
             <div>
-              <h3 className="text-sm font-bold text-[#1D1D1F] dark:text-white">
+              <h3 className="text-sm font-semibold text-[#1D1D1F] dark:text-white">
                 No-Show Rate Over Time
               </h3>
-              <p className="text-xs text-[#6E6E73] mt-0.5">14-day rolling outpatient attendance trend</p>
+              <p className="text-xs text-[#6B6B6F] mt-0.5">14-day rolling outpatient attendance trend</p>
             </div>
-            <div className="flex items-center gap-1 text-xs text-emerald-600 font-bold">
+            <div className="flex items-center gap-1 text-xs text-[#4F8A70] font-medium">
               <TrendingDown className="h-3.5 w-3.5" />
-              <span>-5.2% after automated reminders</span>
+              <span>-5.2% after reminder protocol</span>
             </div>
           </div>
 
-          {/* Minimalist Smooth Area Chart */}
+          {/* Smooth Area Chart in Muted Blue-Gray */}
           <div className="h-64 mt-2">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={timeSeries} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
                 <defs>
-                  <linearGradient id="appleGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#6366f1" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#6366f1" stopOpacity={0.0} />
+                  <linearGradient id="healthGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#647A8A" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="#647A8A" stopOpacity={0.0} />
                   </linearGradient>
                 </defs>
                 <XAxis
                   dataKey="date"
-                  tick={{ fontSize: 11, fill: '#6E6E73' }}
+                  tick={{ fontSize: 11, fill: '#6B6B6F' }}
                   axisLine={false}
                   tickLine={false}
                 />
                 <YAxis
-                  tick={{ fontSize: 11, fill: '#6E6E73' }}
+                  tick={{ fontSize: 11, fill: '#6B6B6F' }}
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={val => `${Math.round(val * 100)}%`}
@@ -181,9 +182,9 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ analytics }) => {
                     if (active && payload && payload.length) {
                       const rate = (payload[0].value as number) * 100;
                       return (
-                        <div className="p-3 rounded-2xl bg-white/90 dark:bg-zinc-800/90 backdrop-blur-xl border border-black/[0.06] dark:border-white/[0.1] shadow-dropdown text-xs">
-                          <p className="font-semibold text-zinc-500">{label}</p>
-                          <p className="text-brand-600 font-extrabold text-sm mt-0.5">{rate.toFixed(1)}% No-Show</p>
+                        <div className="p-3 rounded-xl bg-white/95 dark:bg-[#181818]/95 backdrop-blur-xl border border-black/[0.06] dark:border-white/[0.1] shadow-dropdown text-xs">
+                          <p className="font-medium text-[#6B6B6F]">{label}</p>
+                          <p className="text-[#1D1D1F] dark:text-white font-semibold text-sm mt-0.5">{rate.toFixed(1)}% No-Show</p>
                         </div>
                       );
                     }
@@ -193,23 +194,23 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ analytics }) => {
                 <Area
                   type="monotone"
                   dataKey="no_show_rate"
-                  stroke="#6366f1"
-                  strokeWidth={2.5}
+                  stroke="#647A8A"
+                  strokeWidth={2}
                   fillOpacity={1}
-                  fill="url(#appleGradient)"
+                  fill="url(#healthGradient)"
                 />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Minimal Risk Distribution Donut (Col 9 to 12) */}
-        <div className="lg:col-span-4 p-6 sm:p-7 rounded-3xl apple-card flex flex-col justify-between space-y-4">
+        {/* Minimal Risk Distribution Donut */}
+        <div className="lg:col-span-4 p-6 rounded-2xl bg-white/70 dark:bg-[#181818]/70 backdrop-blur-xl border border-white/60 dark:border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.03)] flex flex-col justify-between space-y-4">
           <div>
-            <h3 className="text-sm font-bold text-[#1D1D1F] dark:text-white">
+            <h3 className="text-sm font-semibold text-[#1D1D1F] dark:text-white">
               Risk Distribution
             </h3>
-            <p className="text-xs text-[#6E6E73] mt-0.5">Ensemble probability clustering</p>
+            <p className="text-xs text-[#6B6B6F] mt-0.5">Ensemble probability clustering</p>
 
             <div className="h-48 relative mt-2">
               <ResponsiveContainer width="100%" height="100%">
@@ -232,10 +233,10 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ analytics }) => {
               </ResponsiveContainer>
 
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-2xl font-extrabold text-[#1D1D1F] dark:text-white">
+                <span className="text-2xl font-semibold text-[#1D1D1F] dark:text-white">
                   {analytics?.risk_distribution.total || 128}
                 </span>
-                <span className="text-[10px] uppercase font-bold tracking-wider text-[#6E6E73]">
+                <span className="text-[10px] uppercase font-semibold text-[#6B6B6F]">
                   Total Slots
                 </span>
               </div>
@@ -244,16 +245,16 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ analytics }) => {
 
           <div className="space-y-2 pt-2 border-t border-black/[0.04] dark:border-white/[0.06] text-xs">
             <div className="flex justify-between items-center">
-              <span className="text-[#6E6E73]">Low Risk (&lt;35%)</span>
-              <span className="font-bold text-emerald-600">{analytics?.risk_distribution.low || 64}</span>
+              <span className="text-[#6B6B6F]">Low Risk (&lt;40%)</span>
+              <span className="font-semibold text-[#4F8A70]">{analytics?.risk_distribution.low || 64}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-[#6E6E73]">Medium Risk (35–64%)</span>
-              <span className="font-bold text-amber-600">{analytics?.risk_distribution.medium || 38}</span>
+              <span className="text-[#6B6B6F]">Medium Risk (40–69%)</span>
+              <span className="font-semibold text-[#C18A3A]">{analytics?.risk_distribution.medium || 38}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-[#6E6E73]">High Risk (≥65%)</span>
-              <span className="font-bold text-rose-600">{analytics?.risk_distribution.high || 26}</span>
+              <span className="text-[#6B6B6F]">High Risk (≥70%)</span>
+              <span className="font-semibold text-[#C9685B]">{analytics?.risk_distribution.high || 26}</span>
             </div>
           </div>
         </div>
@@ -262,13 +263,13 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ analytics }) => {
       {/* Row 2: Department Rankings & Weekday Variance */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Department No-Show Rates */}
-        <div className="p-6 sm:p-7 rounded-3xl apple-card space-y-4">
+        <div className="p-6 rounded-2xl bg-white/70 dark:bg-[#181818]/70 backdrop-blur-xl border border-white/60 dark:border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.03)] space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-black/[0.04] dark:border-white/[0.06]">
             <div>
-              <h3 className="text-sm font-bold text-[#1D1D1F] dark:text-white">
+              <h3 className="text-sm font-semibold text-[#1D1D1F] dark:text-white">
                 Department Variance
               </h3>
-              <p className="text-xs text-[#6E6E73] mt-0.5">Specialty non-attendance percentages</p>
+              <p className="text-xs text-[#6B6B6F] mt-0.5">Specialty non-attendance percentages</p>
             </div>
           </div>
 
@@ -278,13 +279,13 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ analytics }) => {
               return (
                 <div key={i} className="space-y-1">
                   <div className="flex justify-between text-xs font-medium">
-                    <span className="text-zinc-700 dark:text-zinc-300">{d.name}</span>
-                    <span className="font-bold text-[#1D1D1F] dark:text-white">{pct}%</span>
+                    <span className="text-[#1D1D1F] dark:text-white">{d.name}</span>
+                    <span className="font-semibold text-[#1D1D1F] dark:text-white">{pct}%</span>
                   </div>
-                  <div className="w-full h-2 rounded-full bg-black/[0.04] dark:bg-white/[0.06] overflow-hidden">
+                  <div className="w-full h-1.5 rounded-full bg-black/[0.04] dark:bg-white/[0.06] overflow-hidden">
                     <div
                       className={`h-full rounded-full ${
-                        pct >= 24 ? 'bg-rose-500' : pct >= 18 ? 'bg-amber-500' : 'bg-emerald-500'
+                        pct >= 24 ? 'bg-[#C9685B]' : pct >= 18 ? 'bg-[#C18A3A]' : 'bg-[#4F8A70]'
                       }`}
                       style={{ width: `${pct * 2.8}%` }}
                     />
@@ -296,15 +297,15 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ analytics }) => {
         </div>
 
         {/* Day of Week Variance */}
-        <div className="p-6 sm:p-7 rounded-3xl apple-card space-y-4">
+        <div className="p-6 rounded-2xl bg-white/70 dark:bg-[#181818]/70 backdrop-blur-xl border border-white/60 dark:border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.03)] space-y-4">
           <div className="flex items-center justify-between pb-3 border-b border-black/[0.04] dark:border-white/[0.06]">
             <div>
-              <h3 className="text-sm font-bold text-[#1D1D1F] dark:text-white">
+              <h3 className="text-sm font-semibold text-[#1D1D1F] dark:text-white">
                 Weekday Drop-Off
               </h3>
-              <p className="text-xs text-[#6E6E73] mt-0.5">Attendance fluctuation across days of the week</p>
+              <p className="text-xs text-[#6B6B6F] mt-0.5">Attendance fluctuation across days of the week</p>
             </div>
-            <span className="text-[10px] font-bold text-rose-600 px-2 py-0.5 rounded-full bg-rose-500/10">
+            <span className="text-[10px] font-medium text-[#C9685B] px-2 py-0.5 rounded-full bg-[#C9685B]/10">
               Friday Highest (28.9%)
             </span>
           </div>
@@ -312,9 +313,9 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ analytics }) => {
           <div className="h-56 mt-2">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={days} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6E6E73' }} axisLine={false} tickLine={false} />
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6B6B6F' }} axisLine={false} tickLine={false} />
                 <YAxis
-                  tick={{ fontSize: 11, fill: '#6E6E73' }}
+                  tick={{ fontSize: 11, fill: '#6B6B6F' }}
                   axisLine={false}
                   tickLine={false}
                   tickFormatter={val => `${Math.round(val * 100)}%`}
@@ -324,16 +325,16 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ analytics }) => {
                     if (active && payload && payload.length) {
                       const rate = (payload[0].value as number) * 100;
                       return (
-                        <div className="p-3 rounded-2xl bg-white/90 dark:bg-zinc-800/90 backdrop-blur-xl border border-black/[0.06] dark:border-white/[0.1] shadow-dropdown text-xs">
-                          <p className="font-semibold text-zinc-500">{label}</p>
-                          <p className="text-brand-600 font-extrabold text-sm mt-0.5">{rate.toFixed(1)}% Miss Rate</p>
+                        <div className="p-3 rounded-xl bg-white/95 dark:bg-[#181818]/95 backdrop-blur-xl border border-black/[0.06] dark:border-white/[0.1] shadow-dropdown text-xs">
+                          <p className="font-medium text-[#6B6B6F]">{label}</p>
+                          <p className="text-[#1D1D1F] dark:text-white font-semibold text-sm mt-0.5">{rate.toFixed(1)}% Miss Rate</p>
                         </div>
                       );
                     }
                     return null;
                   }}
                 />
-                <Bar dataKey="no_show_rate" fill="#6366f1" radius={[8, 8, 0, 0]} />
+                <Bar dataKey="no_show_rate" fill="#647A8A" radius={[6, 6, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>

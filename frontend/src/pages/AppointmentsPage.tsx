@@ -1,12 +1,14 @@
 import React, { useState } from 'react';
 import {
   Search,
-  Filter,
   Calendar,
   Send,
   CheckCircle2,
   Clock,
-  ChevronRight
+  ChevronRight,
+  Stethoscope,
+  Building2,
+  ArrowRight
 } from 'lucide-react';
 import { Appointment } from '../types';
 import { RiskBadge } from '../components/ui/RiskBadge';
@@ -56,28 +58,28 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({
       {/* Title */}
       <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4">
         <div>
-          <span className="text-[11px] font-extrabold uppercase tracking-widest text-[#6E6E73]">
-            CLINICAL SCHEDULE
+          <span className="text-[11px] font-bold uppercase tracking-wider text-[#6B6B6F]">
+            Clinical Schedule
           </span>
-          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[#1D1D1F] dark:text-[#F5F5F7] mt-1">
-            Appointments Directory
+          <h1 className="text-3xl font-semibold tracking-tight text-[#1D1D1F] dark:text-white mt-1">
+            Appointments
           </h1>
-          <p className="text-sm text-[#6E6E73] mt-1">
-            Monitor patient bookings, assess no-show risk, and trigger multi-channel interventions.
+          <p className="text-sm text-[#6B6B6F] mt-1">
+            Monitor patient bookings, assess no-show risk, and trigger targeted reminders.
           </p>
         </div>
       </div>
 
-      {/* Apple Segmented Tab Control */}
-      <div className="flex items-center gap-1.5 overflow-x-auto p-1 bg-black/[0.03] dark:bg-white/[0.05] rounded-full w-fit max-w-full">
+      {/* Tab Filter Control */}
+      <div className="flex items-center gap-1.5 overflow-x-auto p-1 bg-black/[0.03] dark:bg-white/[0.04] rounded-full w-fit max-w-full">
         {tabs.map(tab => (
           <button
             key={tab}
             onClick={() => onSelectTab(tab)}
-            className={`px-4 py-1.5 text-xs font-bold rounded-full transition-all duration-200 whitespace-nowrap ${
+            className={`px-3.5 py-1 text-xs font-medium rounded-full transition-all whitespace-nowrap ${
               currentTab === tab
-                ? 'bg-white dark:bg-zinc-800 text-[#1D1D1F] dark:text-white shadow-sm'
-                : 'text-[#6E6E73] hover:text-[#1D1D1F] dark:hover:text-white'
+                ? 'bg-white dark:bg-[#2C2C2E] text-[#1D1D1F] dark:text-white shadow-sm'
+                : 'text-[#6B6B6F] hover:text-[#1D1D1F] dark:hover:text-white'
             }`}
           >
             {tab}
@@ -85,23 +87,23 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({
         ))}
       </div>
 
-      {/* Filter Bar with Search & Dropdowns */}
-      <div className="p-3 bg-white/80 dark:bg-[#141416]/80 backdrop-blur-xl border border-black/[0.06] dark:border-white/[0.08] rounded-2xl shadow-sm flex flex-wrap items-center gap-3">
+      {/* Filter Bar */}
+      <div className="p-2.5 bg-white/70 dark:bg-[#181818]/70 backdrop-blur-xl border border-white/60 dark:border-white/10 rounded-2xl shadow-sm flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[220px]">
-          <Search className="h-3.5 w-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-zinc-400" />
+          <Search className="h-3.5 w-3.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#6B6B6F]" />
           <input
             type="text"
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
             placeholder="Search patient name, ID, or doctor..."
-            className="w-full pl-9 pr-4 py-1.5 text-xs bg-black/[0.03] dark:bg-white/[0.05] border border-black/[0.04] dark:border-white/[0.06] rounded-full text-[#1D1D1F] dark:text-white placeholder:text-[#6E6E73] focus:outline-none focus:ring-2 focus:ring-brand-500/30"
+            className="w-full pl-9 pr-4 py-1.5 text-xs bg-black/[0.02] dark:bg-white/[0.04] border border-black/[0.04] dark:border-white/[0.06] rounded-full text-[#1D1D1F] dark:text-white placeholder:text-[#6B6B6F] focus:outline-none"
           />
         </div>
 
         <select
           value={departmentFilter}
           onChange={e => setDepartmentFilter(e.target.value)}
-          className="text-xs font-semibold bg-white dark:bg-zinc-800 border border-black/[0.08] dark:border-white/[0.1] rounded-full px-3.5 py-1.5 text-[#1D1D1F] dark:text-zinc-200 focus:outline-none"
+          className="text-xs font-medium bg-white dark:bg-zinc-800 border border-black/[0.08] dark:border-white/[0.1] rounded-full px-3 py-1.5 text-[#1D1D1F] dark:text-zinc-200 focus:outline-none"
         >
           <option value="">All Departments</option>
           <option value="Cardiology">Cardiology</option>
@@ -112,67 +114,57 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({
         </select>
       </div>
 
-      {/* Appointments List - Apple Settings Style */}
+      {/* Appointments List - Apple Clean Layout */}
       <div className="space-y-2">
         {filtered.map(app => {
           const prob = Math.round((app.prediction?.risk_probability || 0.2) * 100);
           const risk = app.prediction?.risk_level || 'LOW';
           const isHigh = risk === 'HIGH';
           const isMedium = risk === 'MEDIUM';
-          const isConfirmed = app.confirmation_status === 'Confirmed';
+
+          const riskColor = isHigh ? 'text-[#C9685B]' : isMedium ? 'text-[#C18A3A]' : 'text-[#4F8A70]';
+          const avatarBg = isHigh ? 'bg-[#C9685B]/10 text-[#C9685B]' : isMedium ? 'bg-[#C18A3A]/10 text-[#C18A3A]' : 'bg-[#4F8A70]/10 text-[#4F8A70]';
 
           return (
             <div
               key={app.id}
               onClick={() => onSelectAppointment(app)}
-              className="apple-settings-row p-4 rounded-2xl flex items-center justify-between gap-4 cursor-pointer group"
+              className="p-4 rounded-2xl bg-white/70 dark:bg-[#181818]/70 hover:bg-black/[0.02] dark:hover:bg-white/[0.04] backdrop-blur-xl border border-white/60 dark:border-white/10 shadow-[0_4px_16px_rgba(0,0,0,0.02)] flex items-center justify-between gap-4 cursor-pointer transition-all group"
             >
-              {/* Left Column: Avatar + Name + Code + Time + Doctor */}
+              {/* Left Column: Avatar + Name + Code + Time + Doctor + Department */}
               <div className="flex items-center gap-3.5 min-w-0">
-                <div
-                  className={`h-10 w-10 rounded-2xl flex items-center justify-center font-bold text-xs flex-shrink-0 ${
-                    isHigh
-                      ? 'bg-rose-500/10 text-rose-600'
-                      : isMedium
-                      ? 'bg-amber-500/10 text-amber-600'
-                      : 'bg-emerald-500/10 text-emerald-600'
-                  }`}
-                >
-                  {app.patient?.first_name?.charAt(0) || 'P'}
+                <div className={`h-10 w-10 rounded-full flex items-center justify-center font-semibold text-xs flex-shrink-0 ${avatarBg}`}>
+                  {app.patient?.first_name?.charAt(0) || 'P'}{app.patient?.last_name?.charAt(0) || ''}
                 </div>
 
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="font-bold text-sm text-[#1D1D1F] dark:text-[#F5F5F7] group-hover:text-brand-600 transition-colors truncate">
+                    <span className="font-semibold text-sm text-[#1D1D1F] dark:text-white truncate">
                       {app.patient?.first_name} {app.patient?.last_name}
                     </span>
-                    <span className="text-[10px] text-[#6E6E73] font-mono">
+                    <span className="text-[10px] text-[#6B6B6F] font-mono">
                       {app.patient?.patient_code}
                     </span>
                   </div>
-                  <p className="text-xs text-[#6E6E73] mt-0.5 truncate">
-                    {app.appointment_date} · {app.appointment_time} · {app.doctor_name} ({app.department})
+                  <p className="text-xs text-[#6B6B6F] mt-0.5 truncate">
+                    {app.appointment_time} · {app.appointment_date} · {app.doctor_name} ({app.department})
                   </p>
                 </div>
               </div>
 
-              {/* Right Column: Risk typography + Confirmation pill + Action */}
-              <div className="flex items-center gap-4 flex-shrink-0">
+              {/* Right Column: Risk probability + Risk status badge + Confirmation status + Action */}
+              <div className="flex items-center gap-3 sm:gap-4 flex-shrink-0">
                 <div className="text-right">
-                  <div
-                    className={`text-sm font-extrabold ${
-                      isHigh
-                        ? 'text-rose-600 dark:text-rose-400'
-                        : isMedium
-                        ? 'text-amber-600 dark:text-amber-400'
-                        : 'text-emerald-600 dark:text-emerald-400'
-                    }`}
-                  >
-                    {prob}% {risk}
+                  <div className={`text-sm font-semibold ${riskColor}`}>
+                    {prob}% Risk
                   </div>
-                  <span className="text-[10px] font-semibold text-[#6E6E73] block">
+                  <span className="text-[10px] text-[#6B6B6F] block mt-0.5">
                     {app.confirmation_status || 'Not confirmed'}
                   </span>
+                </div>
+
+                <div className="hidden sm:block">
+                  <RiskBadge level={risk} size="sm" />
                 </div>
 
                 {isHigh && (
@@ -181,14 +173,14 @@ export const AppointmentsPage: React.FC<AppointmentsPageProps> = ({
                       e.stopPropagation();
                       onOpenSendReminder(app);
                     }}
-                    className="hidden sm:inline-flex items-center gap-1 px-3 py-1 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white rounded-full text-[11px] font-bold shadow-sm active:scale-95 transition-all"
+                    className="hidden md:inline-flex items-center gap-1 px-3 py-1 bg-[#1D1D1F] hover:bg-[#2C2C2E] dark:bg-white dark:hover:bg-[#E5E5EA] text-white dark:text-[#1D1D1F] rounded-full text-xs font-medium shadow-sm active:scale-95 transition-all"
                   >
                     <Send className="h-3 w-3" />
-                    <span>Send SMS</span>
+                    <span>Send Reminder</span>
                   </button>
                 )}
 
-                <ChevronRight className="h-4 w-4 text-zinc-400 group-hover:translate-x-0.5 transition-transform" />
+                <ChevronRight className="h-4 w-4 text-[#6B6B6F] group-hover:translate-x-0.5 transition-transform" />
               </div>
             </div>
           );

@@ -158,17 +158,40 @@ def get_appointment(appointment_id: int, db: Session = Depends(get_db)):
 def update_appointment_status(
     appointment_id: int,
     status: Optional[str] = None,
+    confirmation_status: Optional[str] = None,
     sms_reminder_sent: Optional[bool] = None,
+    recovery_status: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
-    app = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+    app = db.query(Appointment).options(
+        joinedload(Appointment.patient),
+        joinedload(Appointment.prediction)
+    ).filter(Appointment.id == appointment_id).first()
     if not app:
         raise HTTPException(status_code=404, detail="Appointment not found")
     
     if status is not None:
         app.status = status
+    if confirmation_status is not None:
+        app.confirmation_status = confirmation_status
+        if confirmation_status == "Confirmed":
+            app.recovery_status = "Normal"
+            # If there was a proposed recovery, mark it as Dismissed/Resolved
+            from ..models import SlotRecovery
+            rec = db.query(SlotRecovery).filter(
+                SlotRecovery.appointment_id == appointment_id,
+                SlotRecovery.status == "Proposed"
+            ).first()
+            if rec:
+                rec.status = "Dismissed"
+        elif confirmation_status in ["Cancelled", "No-show"]:
+            if app.recovery_status != "Recovered":
+                app.recovery_status = "At_Risk"
+
     if sms_reminder_sent is not None:
         app.sms_reminder_sent = sms_reminder_sent
+    if recovery_status is not None:
+        app.recovery_status = recovery_status
     
     db.commit()
     db.refresh(app)

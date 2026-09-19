@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MessageSquare, Phone, Send, X, ArrowRight, ShieldCheck, CheckCircle2 } from 'lucide-react';
+import { MessageSquare, Phone, Send, X, ArrowRight, ShieldCheck, CheckCircle2, Loader2 } from 'lucide-react';
 import { Appointment } from '../../types';
 import { api } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
@@ -25,8 +25,8 @@ export const SendReminderModal: React.FC<SendReminderModalProps> = ({
 
   if (!isOpen || !appointment) return null;
 
-  const currentProb = Math.round((appointment.prediction?.risk_probability || 0.87) * 100);
-  const impactProb = Math.round((appointment.prediction?.estimated_impact_prob || 0.68) * 100);
+  const currentProb = Math.round((appointment.prediction?.risk_probability || 0.82) * 100);
+  const impactProb = Math.round((appointment.prediction?.estimated_impact_prob || Math.max(0.12, (appointment.prediction?.risk_probability || 0.82) * 0.45)) * 100);
 
   const handleSend = async () => {
     setIsSubmitting(true);
@@ -39,7 +39,7 @@ export const SendReminderModal: React.FC<SendReminderModalProps> = ({
         notes: `Clinical intervention dispatched via ${channel} to ${appointment.patient?.first_name} ${appointment.patient?.last_name}`,
       });
 
-      showToast(`✓ Reminder scheduled: ${channel} dispatched to ${appointment.patient?.phone}`, 'success');
+      showToast(`✓ Reminder dispatched: ${channel} sent to ${appointment.patient?.phone}`, 'success');
       onReminderSent();
       onClose();
     } catch (err: any) {
@@ -51,31 +51,32 @@ export const SendReminderModal: React.FC<SendReminderModalProps> = ({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-zinc-950/50 backdrop-blur-sm">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-150">
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 10 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 10 }}
-          className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl shadow-dropdown max-w-md w-full overflow-hidden"
+          transition={{ type: 'spring', damping: 26, stiffness: 350 }}
+          className="bg-white/95 dark:bg-[#181818]/95 backdrop-blur-2xl border border-black/[0.08] dark:border-white/[0.1] rounded-2xl shadow-xl max-w-md w-full overflow-hidden"
         >
           {/* Header */}
-          <div className="p-5 border-b border-zinc-100 dark:border-zinc-800 flex items-center justify-between">
+          <div className="p-5 border-b border-black/[0.06] dark:border-white/[0.08] flex items-center justify-between">
             <div className="flex items-center gap-2.5">
-              <div className="h-8 w-8 rounded-lg bg-brand-50 dark:bg-brand-950 text-brand-600 flex items-center justify-center">
+              <div className="h-8 w-8 rounded-lg bg-black/[0.04] dark:bg-white/[0.06] text-[#1D1D1F] dark:text-white flex items-center justify-center">
                 <Send className="h-4 w-4" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                  Send Preventive Reminder
+                <h3 className="text-sm font-semibold text-[#1D1D1F] dark:text-white">
+                  Send Clinical Reminder
                 </h3>
-                <p className="text-xs text-zinc-500">
-                  Target patient: {appointment.patient?.first_name} {appointment.patient?.last_name}
+                <p className="text-xs text-[#6B6B6F]">
+                  Patient: {appointment.patient?.first_name} {appointment.patient?.last_name}
                 </p>
               </div>
             </div>
             <button
               onClick={onClose}
-              className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1"
+              className="text-[#6B6B6F] hover:text-[#1D1D1F] dark:hover:text-white p-1"
             >
               <X className="h-4 w-4" />
             </button>
@@ -83,35 +84,35 @@ export const SendReminderModal: React.FC<SendReminderModalProps> = ({
 
           <div className="p-5 space-y-4">
             {/* Impact Projection Card */}
-            <div className="p-3.5 bg-brand-50/60 dark:bg-brand-950/40 border border-brand-100 dark:border-brand-900/50 rounded-xl">
+            <div className="p-3.5 bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.04] dark:border-white/[0.06] rounded-xl space-y-2">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-medium text-zinc-600 dark:text-zinc-300">
-                  Estimated Risk Impact
+                <span className="font-medium text-[#6B6B6F]">
+                  Estimated Risk Reduction
                 </span>
-                <span className="text-[10px] font-semibold text-brand-600 dark:text-brand-400 bg-brand-100/70 dark:bg-brand-900/80 px-2 py-0.5 rounded-full">
-                  AI Projection
+                <span className="text-[10px] font-semibold text-[#4F8A70] bg-[#4F8A70]/10 px-2 py-0.5 rounded-full">
+                  Model Projection
                 </span>
               </div>
-              <div className="mt-2 flex items-center gap-3">
-                <span className="text-xl font-bold text-rose-600 dark:text-rose-400">
+              <div className="flex items-center gap-3">
+                <span className="text-xl font-semibold text-[#C9685B]">
                   {currentProb}%
                 </span>
-                <ArrowRight className="h-4 w-4 text-zinc-400" />
-                <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
+                <ArrowRight className="h-4 w-4 text-[#6B6B6F]" />
+                <span className="text-xl font-semibold text-[#4F8A70]">
                   {impactProb}%
                 </span>
-                <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/80 px-2 py-0.5 rounded">
+                <span className="text-xs font-semibold text-[#4F8A70] bg-[#4F8A70]/10 px-2 py-0.5 rounded">
                   -{currentProb - impactProb}% Risk
                 </span>
               </div>
-              <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1.5">
-                Automated 2-way confirmation message with one-tap confirmation link.
+              <p className="text-[11px] text-[#6B6B6F]">
+                Automated 2-way confirmation message with quick confirmation link.
               </p>
             </div>
 
             {/* Channel Selection */}
             <div>
-              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
+              <label className="block text-xs font-medium text-[#1D1D1F] dark:text-white mb-1.5">
                 Communication Channel
               </label>
               <div className="grid grid-cols-3 gap-2">
@@ -120,14 +121,14 @@ export const SendReminderModal: React.FC<SendReminderModalProps> = ({
                     key={ch}
                     type="button"
                     onClick={() => setChannel(ch)}
-                    className={`py-2 px-3 rounded-lg border text-xs font-medium flex flex-col items-center gap-1.5 transition-all ${
+                    className={`py-2 px-3 rounded-xl border text-xs font-medium flex flex-col items-center gap-1.5 transition-all ${
                       channel === ch
-                        ? 'border-brand-600 bg-brand-50/50 text-brand-700 dark:bg-brand-950/60 dark:text-brand-300 dark:border-brand-500'
-                        : 'border-zinc-200 dark:border-zinc-800 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800'
+                        ? 'border-[#1D1D1F] dark:border-white bg-[#1D1D1F] dark:bg-white text-white dark:text-[#1D1D1F] shadow-sm'
+                        : 'border-black/[0.06] dark:border-white/[0.08] text-[#6B6B6F] hover:text-[#1D1D1F] dark:hover:text-white'
                     }`}
                   >
                     {ch === 'SMS' && <MessageSquare className="h-4 w-4" />}
-                    {ch === 'WhatsApp' && <CheckCircle2 className="h-4 w-4 text-emerald-500" />}
+                    {ch === 'WhatsApp' && <CheckCircle2 className="h-4 w-4" />}
                     {ch === 'Phone Call' && <Phone className="h-4 w-4" />}
                     <span>{ch}</span>
                   </button>
@@ -137,13 +138,13 @@ export const SendReminderModal: React.FC<SendReminderModalProps> = ({
 
             {/* Timing Selection */}
             <div>
-              <label className="block text-xs font-medium text-zinc-700 dark:text-zinc-300 mb-1.5">
+              <label className="block text-xs font-medium text-[#1D1D1F] dark:text-white mb-1.5">
                 Dispatch Schedule
               </label>
               <select
                 value={scheduledFor}
                 onChange={e => setScheduledFor(e.target.value)}
-                className="w-full text-xs px-3 py-2 bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg text-zinc-800 dark:text-zinc-200 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                className="w-full text-xs px-3 py-2 bg-white dark:bg-zinc-800 border border-black/[0.08] dark:border-white/[0.1] rounded-xl text-[#1D1D1F] dark:text-white focus:outline-none"
               >
                 <option value="24 hours before appointment">24 hours before appointment (Recommended)</option>
                 <option value="48 hours before appointment">48 hours before appointment</option>
@@ -153,34 +154,32 @@ export const SendReminderModal: React.FC<SendReminderModalProps> = ({
             </div>
 
             {/* Phone Confirmation */}
-            <div className="p-3 bg-zinc-50 dark:bg-zinc-800/60 rounded-lg text-xs text-zinc-600 dark:text-zinc-400">
-              <span className="font-semibold text-zinc-800 dark:text-zinc-200">Recipient: </span>
+            <div className="p-3 bg-black/[0.02] dark:bg-white/[0.03] rounded-xl text-xs text-[#6B6B6F]">
+              <span className="font-semibold text-[#1D1D1F] dark:text-white">Recipient: </span>
               {appointment.patient?.phone} ({appointment.patient?.first_name} {appointment.patient?.last_name})
             </div>
           </div>
 
           {/* Footer */}
-          <div className="p-4 border-t border-zinc-100 dark:border-zinc-800 flex items-center justify-end gap-2.5">
+          <div className="p-4 border-t border-black/[0.06] dark:border-white/[0.08] flex items-center justify-end gap-2.5">
             <button
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-3 py-1.5 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
+              className="px-3.5 py-1.5 text-xs font-medium text-[#6B6B6F] hover:text-[#1D1D1F] dark:hover:text-white rounded-xl transition-colors"
             >
               Cancel
             </button>
             <button
               onClick={handleSend}
               disabled={isSubmitting}
-              className="px-4 py-1.5 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow-soft transition-all flex items-center gap-1.5"
+              className="px-4 py-1.5 text-xs font-medium text-white dark:text-[#1D1D1F] bg-[#1D1D1F] dark:bg-white hover:bg-[#2C2C2E] dark:hover:bg-[#E5E5EA] rounded-xl shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50"
             >
               {isSubmitting ? (
-                <span>Scheduling...</span>
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
               ) : (
-                <>
-                  <Send className="h-3.5 w-3.5" />
-                  <span>Send Reminder</span>
-                </>
+                <Send className="h-3.5 w-3.5" />
               )}
+              <span>Send Reminder</span>
             </button>
           </div>
         </motion.div>

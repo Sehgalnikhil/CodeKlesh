@@ -226,7 +226,7 @@ export const AddPatientModal: React.FC<AddPatientModalProps> = ({
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="px-4 py-1.5 text-xs font-semibold text-white bg-brand-600 hover:bg-brand-700 rounded-lg shadow-soft transition-all"
+                className="px-4 py-1.5 text-xs font-medium text-white dark:text-[#1D1D1F] bg-[#1D1D1F] dark:bg-white hover:bg-[#2C2C2E] dark:hover:bg-[#E5E5EA] rounded-xl shadow-sm transition-all"
               >
                 {isSubmitting ? 'Registering...' : 'Register Patient'}
               </button>

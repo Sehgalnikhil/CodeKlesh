@@ -101,10 +101,23 @@ export const api = {
     });
   },
 
-  async updateAppointmentStatus(id: number, status: string, sms_reminder_sent?: boolean): Promise<Appointment> {
-    const params = new URLSearchParams({ status });
-    if (sms_reminder_sent !== undefined) params.append('sms_reminder_sent', String(sms_reminder_sent));
-    return request(`/appointments/${id}?${params.toString()}`, {
+  async updateAppointmentStatus(id: number, params: {
+    status?: string;
+    confirmation_status?: string;
+    sms_reminder_sent?: boolean;
+    recovery_status?: string;
+  } | string, sms_reminder_sent?: boolean): Promise<Appointment> {
+    const searchParams = new URLSearchParams();
+    if (typeof params === 'string') {
+      searchParams.append('status', params);
+      if (sms_reminder_sent !== undefined) searchParams.append('sms_reminder_sent', String(sms_reminder_sent));
+    } else {
+      if (params.status) searchParams.append('status', params.status);
+      if (params.confirmation_status) searchParams.append('confirmation_status', params.confirmation_status);
+      if (params.sms_reminder_sent !== undefined) searchParams.append('sms_reminder_sent', String(params.sms_reminder_sent));
+      if (params.recovery_status) searchParams.append('recovery_status', params.recovery_status);
+    }
+    return request(`/appointments/${id}?${searchParams.toString()}`, {
       method: 'PATCH',
     });
   },

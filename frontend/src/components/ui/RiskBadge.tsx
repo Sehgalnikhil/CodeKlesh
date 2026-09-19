@@ -9,16 +9,16 @@ export const RiskBadge: React.FC<RiskBadgeProps> = ({ level, size = 'md' }) => {
   const normalized = (level || 'LOW').toUpperCase();
 
   const styles = {
-    HIGH: 'bg-rose-50/80 text-rose-700 border-rose-200/60 dark:bg-rose-950/30 dark:text-rose-300 dark:border-rose-800/40 shadow-[0_1px_4px_rgba(244,63,94,0.08)]',
-    MEDIUM: 'bg-amber-50/80 text-amber-700 border-amber-200/60 dark:bg-amber-950/30 dark:text-amber-300 dark:border-amber-800/40 shadow-[0_1px_4px_rgba(245,158,11,0.08)]',
-    LOW: 'bg-emerald-50/80 text-emerald-700 border-emerald-200/60 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-800/40 shadow-[0_1px_4px_rgba(16,185,129,0.08)]',
-  }[normalized] || 'bg-zinc-50/80 text-zinc-700 border-zinc-200/60 dark:bg-zinc-800/40 dark:text-zinc-300 dark:border-zinc-700/40';
+    HIGH: 'bg-[#C9685B]/10 text-[#C9685B] border-[#C9685B]/25 dark:bg-[#C9685B]/15 dark:text-[#E08579] dark:border-[#C9685B]/30',
+    MEDIUM: 'bg-[#C18A3A]/10 text-[#C18A3A] border-[#C18A3A]/25 dark:bg-[#C18A3A]/15 dark:text-[#E5A855] dark:border-[#C18A3A]/30',
+    LOW: 'bg-[#4F8A70]/10 text-[#4F8A70] border-[#4F8A70]/25 dark:bg-[#4F8A70]/15 dark:text-[#6CB294] dark:border-[#4F8A70]/30',
+  }[normalized] || 'bg-zinc-100 text-[#6B6B6F] border-black/10 dark:bg-zinc-800 dark:text-zinc-300 dark:border-white/10';
 
   const dotStyles = {
-    HIGH: 'bg-rose-500 shadow-[0_0_8px_rgba(244,63,94,0.6)]',
-    MEDIUM: 'bg-amber-500 shadow-[0_0_8px_rgba(245,158,11,0.6)]',
-    LOW: 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.6)]',
-  }[normalized] || 'bg-zinc-400';
+    HIGH: 'bg-[#C9685B]',
+    MEDIUM: 'bg-[#C18A3A]',
+    LOW: 'bg-[#4F8A70]',
+  }[normalized] || 'bg-[#6B6B6F]';
 
   const sizeStyles = {
     sm: 'text-[10px] px-2.5 py-0.5 font-semibold tracking-wide',

@@ -100,7 +100,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           {/* Quick action: Book Appointment */}
           <button
             onClick={onOpenBookAppointment}
-            className="inline-flex items-center gap-1.5 px-4 py-1.5 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-xs font-semibold text-white rounded-full shadow-[0_2px_10px_rgba(79,70,229,0.3)] active:scale-95 transition-all"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-[#1D1D1F] hover:bg-[#2C2C2E] dark:bg-white dark:hover:bg-[#E5E5EA] text-xs font-medium text-white dark:text-[#1D1D1F] rounded-full shadow-sm active:scale-95 transition-all"
           >
             <CalendarPlus className="h-3.5 w-3.5" />
             <span>Book Appt</span>
@@ -115,7 +115,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             title="Toggle Dark Mode"
           >
             {darkMode ? (
-              <Sun className="h-4 w-4 text-amber-400" />
+              <Sun className="h-4 w-4 text-[#C18A3A]" />
             ) : (
               <Moon className="h-4 w-4 text-zinc-600" />
             )}
@@ -129,17 +129,17 @@ export const Navbar: React.FC<NavbarProps> = ({
               title="Notifications"
             >
               <Bell className="h-4 w-4" />
-              <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-rose-500 shadow-[0_0_6px_rgba(244,63,94,0.7)]" />
+              <span className="absolute top-1.5 right-1.5 h-2 w-2 rounded-full bg-[#C9685B]" />
             </button>
 
             {showNotifications && (
-              <div className="absolute right-0 mt-3 w-80 bg-white/95 dark:bg-[#161618]/95 backdrop-blur-2xl border border-black/[0.08] dark:border-white/[0.12] rounded-3xl shadow-dropdown p-4 z-50 animate-in fade-in zoom-in-95 duration-200">
+              <div className="absolute right-0 mt-3 w-80 bg-white/95 dark:bg-[#181818]/95 backdrop-blur-2xl border border-black/[0.08] dark:border-white/[0.12] rounded-2xl shadow-dropdown p-4 z-50 animate-in fade-in zoom-in-95 duration-200">
                 <div className="flex items-center justify-between pb-2.5 border-b border-black/[0.06] dark:border-white/[0.08]">
-                  <span className="text-xs font-bold text-[#1D1D1F] dark:text-white">
+                  <span className="text-xs font-semibold text-[#1D1D1F] dark:text-white">
                     Notifications
                   </span>
                   <span
-                    className="text-[10px] text-brand-600 dark:text-brand-400 font-semibold cursor-pointer hover:underline"
+                    className="text-[10px] text-[#6B6B6F] hover:text-[#1D1D1F] dark:hover:text-white font-medium cursor-pointer"
                     onClick={() => setShowNotifications(false)}
                   >
                     Mark all read
@@ -149,17 +149,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                   {notifications.map(n => (
                     <div
                       key={n.id}
-                      className={`p-2.5 rounded-2xl text-xs transition-colors ${
+                      className={`p-2.5 rounded-xl text-xs transition-colors ${
                         n.unread
-                          ? 'bg-brand-50/60 dark:bg-white/[0.04] border border-brand-100/50 dark:border-white/[0.06]'
+                          ? 'bg-black/[0.02] dark:bg-white/[0.04] border border-black/[0.04] dark:border-white/[0.06]'
                           : 'bg-transparent'
                       }`}
                     >
                       <div className="flex items-center justify-between">
-                        <span className="font-semibold text-zinc-800 dark:text-zinc-200">{n.title}</span>
-                        <span className="text-[10px] text-[#6E6E73]">{n.time}</span>
+                        <span className="font-semibold text-[#1D1D1F] dark:text-white">{n.title}</span>
+                        <span className="text-[10px] text-[#6B6B6F]">{n.time}</span>
                       </div>
-                      <p className="text-[11px] text-[#6E6E73] mt-0.5">{n.desc}</p>
+                      <p className="text-[11px] text-[#6B6B6F] mt-0.5">{n.desc}</p>
                     </div>
                   ))}
                 </div>

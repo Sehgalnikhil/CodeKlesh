@@ -311,6 +311,8 @@ const MainAppContent: React.FC = () => {
         isOpen={isSpotlightOpen}
         onClose={() => setIsSpotlightOpen(false)}
         patients={patients}
+        appointments={appointments}
+        onSelectAppointment={handleSelectAppointment}
         onSelectPatient={patientId => {
           handleBookForPatient(patientId);
         }}

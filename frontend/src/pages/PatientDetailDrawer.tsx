@@ -10,14 +10,18 @@ import {
   Sparkles,
   ArrowRight,
   TrendingDown,
-  ShieldAlert,
   PhoneCall,
-  Activity,
-  CheckCircle2
+  CheckCircle2,
+  Stethoscope,
+  Building2,
+  FileText,
+  Loader2,
+  Check
 } from 'lucide-react';
 import { Appointment } from '../types';
 import { RiskBadge } from '../components/ui/RiskBadge';
 import { useAuth } from '../context/AuthContext';
+import { api } from '../api/client';
 
 interface PatientDetailDrawerProps {
   appointment: Appointment | null;
@@ -39,29 +43,80 @@ export const PatientDetailDrawer: React.FC<PatientDetailDrawerProps> = ({
   onRefreshData,
 }) => {
   const { showToast } = useAuth();
-  const [callScheduled, setCallScheduled] = useState(false);
+  const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
+  const [isSendingReminder, setIsSendingReminder] = useState(false);
+  const [reminderSentInfo, setReminderSentInfo] = useState<{ time: string; channel: string } | null>(null);
 
   if (!isOpen || !appointment) return null;
 
   const patient = appointment.patient;
   const prediction = appointment.prediction;
 
-  const prob = Math.round((prediction?.risk_probability || 0.87) * 100);
-  const impactProb = Math.round((prediction?.estimated_impact_prob || 0.68) * 100);
-  const riskLevel = prediction?.risk_level || 'HIGH';
-  const isHigh = riskLevel === 'HIGH';
-  const isUnconfirmed = appointment.confirmation_status !== 'Confirmed';
+  const prob = Math.round((prediction?.risk_probability || 0.82) * 100);
+  const impactProb = Math.round((prediction?.estimated_impact_prob || Math.max(0.12, (prediction?.risk_probability || 0.82) * 0.45)) * 100);
+  const riskLevel = prediction?.risk_level || (prob >= 70 ? 'HIGH' : prob >= 40 ? 'MEDIUM' : 'LOW');
 
-  const factors = prediction?.top_factors || [
+  const riskColor = riskLevel === 'HIGH' ? '#C9685B' : riskLevel === 'MEDIUM' ? '#C18A3A' : '#4F8A70';
+
+  const factors = prediction?.top_factors?.length ? prediction.top_factors : [
     { factor: 'previous_no_shows', label: 'Previous missed appointments', impact_direction: 'positive', contribution: 0.31, percentage: 31 },
-    { factor: 'booking_gap', label: 'Long booking gap (17d)', impact_direction: 'positive', contribution: 0.22, percentage: 22 },
-    { factor: 'reminder_history', label: 'No response to SMS', impact_direction: 'positive', contribution: 0.18, percentage: 18 },
-    { factor: 'appointment_time', label: 'Appointment timing', impact_direction: 'positive', contribution: 0.11, percentage: 11 },
+    { factor: 'booking_gap', label: 'Long booking gap (14d)', impact_direction: 'positive', contribution: 0.22, percentage: 22 },
+    { factor: 'reminder_history', label: 'Unconfirmed reminder response', impact_direction: 'positive', contribution: 0.18, percentage: 18 },
+    { factor: 'appointment_time', label: 'Appointment timing / weekday', impact_direction: 'positive', contribution: 0.11, percentage: 11 },
   ];
 
-  const handleScheduleCall = () => {
-    setCallScheduled(true);
-    showToast(`✓ Clinical outreach call queued for ${patient?.first_name} ${patient?.last_name}`, 'success');
+  // SVG circular gauge geometry
+  const radius = 42;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (prob / 100) * circumference;
+
+  const handleStatusChange = async (newConfirmation: string) => {
+    try {
+      setIsUpdatingStatus(true);
+      let appStatus = appointment.status;
+      if (newConfirmation === 'Cancelled') appStatus = 'Cancelled';
+      else if (newConfirmation === 'Completed') appStatus = 'Completed';
+      else if (newConfirmation === 'No-show') appStatus = 'No-show';
+      else if (newConfirmation === 'Confirmed') appStatus = 'Scheduled';
+
+      await api.updateAppointmentStatus(appointment.id, {
+        confirmation_status: newConfirmation,
+        status: appStatus,
+      });
+
+      showToast(`✓ Confirmation updated to ${newConfirmation}`, 'success');
+      onRefreshData();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to update status', 'error');
+    } finally {
+      setIsUpdatingStatus(false);
+    }
+  };
+
+  const handleQuickSendReminder = async () => {
+    try {
+      setIsSendingReminder(true);
+      const res = await api.dispatchReminder({
+        appointment_id: appointment.id,
+        patient_id: appointment.patient_id,
+        channel: 'SMS + WhatsApp',
+        strategy: 'urgent_confirmation',
+        notes: 'Priority automated clinical reminder with deep-link confirmation',
+      });
+
+      const now = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      setReminderSentInfo({
+        time: now,
+        channel: res.channel || 'SMS + WhatsApp',
+      });
+
+      showToast('✓ Reminder dispatched to patient via SMS + WhatsApp', 'success');
+      onRefreshData();
+    } catch (err: any) {
+      showToast(err.message || 'Failed to dispatch reminder', 'error');
+    } finally {
+      setIsSendingReminder(false);
+    }
   };
 
   return (
@@ -73,134 +128,199 @@ export const PatientDetailDrawer: React.FC<PatientDetailDrawerProps> = ({
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           onClick={onClose}
-          className="fixed inset-0 bg-black/40 backdrop-blur-md transition-opacity"
+          className="fixed inset-0 bg-black/30 backdrop-blur-sm transition-opacity"
         />
 
-        {/* Large Floating Apple Sheet */}
+        {/* Refined Glass Panel sliding from right */}
         <motion.div
-          initial={{ x: '100%', opacity: 0.8, scale: 0.98 }}
-          animate={{ x: 0, opacity: 1, scale: 1 }}
-          exit={{ x: '100%', opacity: 0.8, scale: 0.98 }}
-          transition={{ type: 'spring', damping: 32, stiffness: 320 }}
-          className="relative w-full max-w-lg m-3 rounded-[32px] bg-white/95 dark:bg-[#161618]/95 backdrop-blur-3xl border border-white/80 dark:border-white/10 shadow-[0_24px_64px_rgba(0,0,0,0.3)] flex flex-col justify-between overflow-hidden z-10"
+          initial={{ x: '100%' }}
+          animate={{ x: 0 }}
+          exit={{ x: '100%' }}
+          transition={{ type: 'spring', damping: 30, stiffness: 300 }}
+          className="relative w-full max-w-lg m-2 sm:m-4 rounded-[28px] bg-white/85 dark:bg-[#181818]/90 backdrop-blur-2xl border border-white/60 dark:border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.15)] flex flex-col justify-between overflow-hidden z-10"
         >
-          {/* Sheet Top Bar */}
-          <div className="p-6 border-b border-black/[0.06] dark:border-white/[0.08] flex items-center justify-between bg-black/[0.02] dark:bg-white/[0.02]">
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#6E6E73]">
-                Patient Intelligence
-              </span>
-              <h2 className="text-xl font-extrabold text-[#1D1D1F] dark:text-white mt-0.5">
-                {patient?.first_name} {patient?.last_name}
-              </h2>
-              <div className="flex items-center gap-2 mt-1 text-xs text-[#6E6E73]">
-                <span className="font-mono bg-black/[0.04] dark:bg-white/[0.08] px-2 py-0.5 rounded-md text-[#1D1D1F] dark:text-[#F5F5F7] font-semibold">
-                  {patient?.patient_code}
-                </span>
-                <span>·</span>
-                <span>Age: {patient?.age}</span>
-                <span>·</span>
-                <span>{patient?.gender}</span>
+          {/* Top Bar */}
+          <div className="p-6 border-b border-black/[0.06] dark:border-white/[0.08] flex items-center justify-between bg-black/[0.01] dark:bg-white/[0.02]">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-full bg-[#1D1D1F] text-white flex items-center justify-center font-semibold text-sm tracking-tight shadow-sm">
+                {patient?.first_name?.[0] || 'P'}{patient?.last_name?.[0] || ''}
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-[#1D1D1F] dark:text-white tracking-tight">
+                  {patient?.first_name} {patient?.last_name}
+                </h2>
+                <div className="flex items-center gap-2 mt-0.5 text-xs text-[#6B6B6F]">
+                  <span className="font-mono bg-black/[0.04] dark:bg-white/[0.06] px-1.5 py-0.5 rounded text-[11px] font-medium text-[#1D1D1F] dark:text-white">
+                    {patient?.patient_code || `PT-${appointment.patient_id}`}
+                  </span>
+                  <span>·</span>
+                  <span>{patient?.age} yrs</span>
+                  <span>·</span>
+                  <span>{patient?.gender}</span>
+                </div>
               </div>
             </div>
 
             <button
               onClick={onClose}
-              className="h-8 w-8 rounded-full border border-black/[0.08] dark:border-white/[0.1] flex items-center justify-center text-zinc-400 hover:text-zinc-700 dark:hover:text-zinc-200 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-all"
+              className="h-8 w-8 rounded-full border border-black/[0.08] dark:border-white/[0.1] flex items-center justify-center text-[#6B6B6F] hover:text-[#1D1D1F] dark:hover:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-all"
             >
               <X className="h-4 w-4" />
             </button>
           </div>
 
-          {/* Sheet Body Content */}
+          {/* Body Content */}
           <div className="flex-1 overflow-y-auto p-6 space-y-6">
-            {/* Patient Profile Statistics - Apple Health Format */}
-            <div className="grid grid-cols-3 gap-3">
-              <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.04] dark:border-white/[0.06] text-center">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#6E6E73] block">Attendance</span>
-                <span className="text-2xl font-extrabold text-[#1D1D1F] dark:text-white mt-1 block">82%</span>
-                <span className="text-[10px] text-emerald-600 font-semibold mt-0.5 block">Good Baseline</span>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.04] dark:border-white/[0.06] text-center">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#6E6E73] block">Appointments</span>
-                <span className="text-2xl font-extrabold text-[#1D1D1F] dark:text-white mt-1 block">17</span>
-                <span className="text-[10px] text-[#6E6E73] font-semibold mt-0.5 block">Lifetime Visits</span>
-              </div>
-
-              <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.04] dark:border-white/[0.06] text-center">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#6E6E73] block">No-Shows</span>
-                <span className="text-2xl font-extrabold text-rose-600 mt-1 block">3</span>
-                <span className="text-[10px] text-rose-500 font-semibold mt-0.5 block">Past Misses</span>
-              </div>
-            </div>
-
-            {/* AI Behavior Summary Pills */}
-            <div className="space-y-2">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-[#6E6E73] block">
-                AI Behavioral Patterns
-              </span>
-              <div className="p-3.5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.04] dark:border-white/[0.06] space-y-2 text-xs">
-                <div className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300 font-medium">
-                  <div className="h-1.5 w-1.5 rounded-full bg-brand-500 flex-shrink-0" />
-                  <span>"Usually confirms within 6 hours."</span>
+            {/* Appointment Meta Cards */}
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="p-3.5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.04] dark:border-white/[0.06] space-y-1">
+                <div className="flex items-center gap-1.5 text-[#6B6B6F]">
+                  <Stethoscope className="h-3.5 w-3.5" />
+                  <span className="text-[10px] font-semibold uppercase tracking-wider">Clinician</span>
                 </div>
-                <div className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300 font-medium">
-                  <div className="h-1.5 w-1.5 rounded-full bg-amber-500 flex-shrink-0" />
-                  <span>"Morning appointments show higher risk."</span>
+                <div className="font-medium text-[#1D1D1F] dark:text-white truncate">
+                  {appointment.doctor_name}
                 </div>
-                <div className="flex items-center gap-2 text-zinc-700 dark:text-zinc-300 font-medium">
-                  <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 flex-shrink-0" />
-                  <span>"Responds 3x faster to WhatsApp reminders than phone calls."</span>
+                <div className="text-[11px] text-[#6B6B6F] truncate">
+                  {appointment.department}
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.04] dark:border-white/[0.06] space-y-1">
+                <div className="flex items-center gap-1.5 text-[#6B6B6F]">
+                  <Calendar className="h-3.5 w-3.5" />
+                  <span className="text-[10px] font-semibold uppercase tracking-wider">Schedule</span>
+                </div>
+                <div className="font-medium text-[#1D1D1F] dark:text-white">
+                  {appointment.appointment_date}
+                </div>
+                <div className="text-[11px] text-[#6B6B6F]">
+                  {appointment.appointment_time} · {appointment.appointment_type || 'Follow-up'}
                 </div>
               </div>
             </div>
 
-            {/* Current Visit Assessment Card */}
-            <div className="p-5 rounded-2xl bg-rose-500/10 border border-rose-500/20 space-y-3">
+            {/* Live Confirmation Status Selector */}
+            <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.04] dark:border-white/[0.06] space-y-2.5">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
-                  Current Visit Vulnerability
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[#6B6B6F]">
+                  Confirmation Status
+                </span>
+                {isUpdatingStatus && (
+                  <div className="flex items-center gap-1 text-[11px] text-[#6B6B6F]">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <span>Updating...</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
+                {[
+                  { key: 'Confirmed', label: 'Confirmed', color: 'hover:border-[#4F8A70]' },
+                  { key: 'Not confirmed', label: 'Pending', color: 'hover:border-[#C18A3A]' },
+                  { key: 'Completed', label: 'Completed', color: 'hover:border-[#647A8A]' },
+                  { key: 'Cancelled', label: 'Cancelled', color: 'hover:border-[#C9685B]' },
+                  { key: 'No-show', label: 'No-show', color: 'hover:border-[#C9685B]' },
+                ].map(opt => {
+                  const isActive = (appointment.confirmation_status === opt.key) ||
+                    (opt.key === 'Not confirmed' && !appointment.confirmation_status) ||
+                    (opt.key === 'Cancelled' && appointment.status === 'Cancelled') ||
+                    (opt.key === 'Completed' && appointment.status === 'Completed') ||
+                    (opt.key === 'No-show' && appointment.status === 'No-show');
+
+                  return (
+                    <button
+                      key={opt.key}
+                      disabled={isUpdatingStatus}
+                      onClick={() => handleStatusChange(opt.key)}
+                      className={`px-2 py-1.5 rounded-xl text-xs font-medium transition-all text-center border ${
+                        isActive
+                          ? 'bg-[#1D1D1F] dark:bg-white text-white dark:text-[#1D1D1F] border-transparent shadow-sm'
+                          : 'bg-white/60 dark:bg-black/30 text-[#6B6B6F] border-black/[0.06] dark:border-white/[0.06] hover:text-[#1D1D1F] dark:hover:text-white'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Circular Ring Risk Gauge */}
+            <div className="p-5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.04] dark:border-white/[0.06]">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[#6B6B6F]">
+                  Missed Appointment Risk
                 </span>
                 <RiskBadge level={riskLevel} size="sm" />
               </div>
 
-              <div className="flex items-baseline justify-between">
-                <div>
-                  <div className="text-3xl font-extrabold text-rose-600 tracking-tight">
-                    {prob}% Risk
+              <div className="flex items-center gap-6">
+                {/* SVG Ring */}
+                <div className="relative flex items-center justify-center flex-shrink-0">
+                  <svg className="w-24 h-24 transform -rotate-90">
+                    <circle
+                      cx="48"
+                      cy="48"
+                      r={radius}
+                      stroke="currentColor"
+                      strokeWidth="7"
+                      fill="transparent"
+                      className="text-black/[0.06] dark:text-white/[0.08]"
+                    />
+                    <circle
+                      cx="48"
+                      cy="48"
+                      r={radius}
+                      stroke={riskColor}
+                      strokeWidth="7"
+                      fill="transparent"
+                      strokeDasharray={circumference}
+                      strokeDashoffset={strokeDashoffset}
+                      strokeLinecap="round"
+                      className="transition-all duration-700 ease-out"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex flex-col items-center justify-center">
+                    <span className="text-xl font-bold text-[#1D1D1F] dark:text-white tracking-tight">
+                      {prob}%
+                    </span>
+                    <span className="text-[9px] font-semibold text-[#6B6B6F] uppercase">
+                      Risk
+                    </span>
                   </div>
-                  <p className="text-xs text-[#6E6E73] mt-0.5">
-                    Tomorrow · {appointment.appointment_time} · {appointment.doctor_name}
-                  </p>
                 </div>
 
-                <div className="text-right">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-[#6E6E73] block">Status</span>
-                  <span className="text-xs font-bold text-rose-600">
-                    {appointment.confirmation_status || 'Not confirmed'}
-                  </span>
+                {/* Risk narrative */}
+                <div className="space-y-1.5 text-xs text-[#6B6B6F]">
+                  <p className="leading-relaxed">
+                    Based on random forest probability modeling across clinical history and engagement markers.
+                  </p>
+                  <div className="flex items-center gap-2 pt-1 font-medium text-[#1D1D1F] dark:text-white">
+                    <span>Projected with reminder:</span>
+                    <span className="font-bold text-[#4F8A70]">{impactProb}% ({prob - impactProb}% drop)</span>
+                  </div>
                 </div>
               </div>
             </div>
 
-            {/* Explainable AI Factor Weights */}
+            {/* Explainable AI Model Factors */}
             <div className="space-y-3">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-[#6E6E73] block">
-                Why this appointment is at risk
+              <span className="text-[11px] font-bold uppercase tracking-wider text-[#6B6B6F] block">
+                Why this risk? (Model Explanation)
               </span>
 
               <div className="p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.04] dark:border-white/[0.06] space-y-3 text-xs">
                 {factors.map((f, idx) => (
                   <div key={idx} className="space-y-1">
                     <div className="flex justify-between font-medium">
-                      <span className="text-zinc-700 dark:text-zinc-300">{f.label}</span>
-                      <span className="font-bold text-rose-600">+{Math.abs(f.percentage)}%</span>
+                      <span className="text-[#1D1D1F] dark:text-white">{f.label}</span>
+                      <span className="font-semibold text-[#C9685B]">+{Math.abs(f.percentage)}%</span>
                     </div>
                     <div className="w-full h-1.5 rounded-full bg-black/[0.05] dark:bg-white/[0.08] overflow-hidden">
                       <div
-                        className="h-full rounded-full bg-rose-500"
-                        style={{ width: `${Math.min(100, Math.abs(f.percentage) * 2.5)}%` }}
+                        className="h-full rounded-full bg-[#C9685B] transition-all duration-500"
+                        style={{ width: `${Math.min(100, Math.abs(f.percentage) * 2.6)}%` }}
                       />
                     </div>
                   </div>
@@ -208,38 +328,90 @@ export const PatientDetailDrawer: React.FC<PatientDetailDrawerProps> = ({
               </div>
             </div>
 
-            {/* AI Recommendation Box */}
-            <div className="p-5 rounded-2xl bg-gradient-to-br from-brand-500/10 via-indigo-500/10 to-transparent border border-brand-500/20 space-y-3">
-              <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-brand-600 dark:text-brand-400">
+            {/* Recommended Next Action Panel */}
+            <div className="p-5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.08] space-y-3">
+              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#647A8A]">
                 <Sparkles className="h-3.5 w-3.5" />
-                <span>Recommended Action</span>
+                <span>Recommended Next Action</span>
               </div>
-              <h4 className="text-sm font-bold text-[#1D1D1F] dark:text-white">
-                Dispatch personalized SMS + WhatsApp reminder
-              </h4>
-              <div className="p-3 rounded-xl bg-white/80 dark:bg-zinc-900/80 border border-brand-500/20 flex items-center justify-between text-xs">
-                <span className="text-[#6E6E73]">Projected risk reduction:</span>
-                <span className="font-bold text-emerald-600">{prob}% → {impactProb}% (-19%)</span>
+
+              <div>
+                <h4 className="text-sm font-semibold text-[#1D1D1F] dark:text-white">
+                  {riskLevel === 'HIGH' ? 'Send Urgent Clinical Reminder' : 'Automated Reminder Dispatch'}
+                </h4>
+                <p className="text-xs text-[#6B6B6F] mt-1 leading-relaxed">
+                  {riskLevel === 'HIGH'
+                    ? 'Patient has a high predicted no-show probability and has not confirmed. Dispatching reminder offers a projected risk reduction.'
+                    : 'Standard confirmation check is advised to lock the capacity in the scheduling grid.'}
+                </p>
+              </div>
+
+              {/* Delivery status banner if sent */}
+              {(reminderSentInfo || appointment.sms_reminder_sent) && (
+                <div className="p-3 rounded-xl bg-[#4F8A70]/10 border border-[#4F8A70]/20 flex items-center gap-2.5 text-xs text-[#4F8A70]">
+                  <Check className="h-4 w-4 flex-shrink-0" />
+                  <div>
+                    <span className="font-semibold">✓ Reminder sent</span>
+                    <span className="text-[11px] opacity-80 block">
+                      {reminderSentInfo ? `${reminderSentInfo.time} · Delivered via ${reminderSentInfo.channel}` : 'Delivered to patient mobile'}
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  disabled={isSendingReminder}
+                  onClick={handleQuickSendReminder}
+                  className="flex-1 py-2 px-3 bg-[#1D1D1F] hover:bg-[#2C2C2E] dark:bg-white dark:hover:bg-[#E5E5EA] text-white dark:text-[#1D1D1F] rounded-xl text-xs font-medium transition-all shadow-sm flex items-center justify-center gap-1.5 disabled:opacity-50"
+                >
+                  {isSendingReminder ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Send className="h-3.5 w-3.5" />
+                  )}
+                  <span>Send Reminder</span>
+                </button>
+
+                <button
+                  onClick={() => onOpenSendReminder(appointment)}
+                  className="py-2 px-3 rounded-xl text-xs font-medium border border-black/[0.08] dark:border-white/[0.1] text-[#1D1D1F] dark:text-white hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-all"
+                >
+                  Schedule
+                </button>
+
+                <button
+                  onClick={onClose}
+                  className="py-2 px-3 rounded-xl text-xs font-medium text-[#6B6B6F] hover:text-[#1D1D1F] dark:hover:text-white transition-all"
+                >
+                  Dismiss
+                </button>
               </div>
             </div>
           </div>
 
-          {/* Sheet Footer Controls */}
-          <div className="p-5 border-t border-black/[0.06] dark:border-white/[0.08] bg-black/[0.02] dark:bg-white/[0.02] flex items-center justify-between gap-3">
+          {/* Footer Navigation */}
+          <div className="p-4 border-t border-black/[0.06] dark:border-white/[0.08] bg-black/[0.01] dark:bg-white/[0.02] flex items-center justify-between gap-3">
             <button
-              onClick={() => onOpenSendReminder(appointment)}
-              className="flex-1 py-2.5 px-4 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white rounded-full text-xs font-bold shadow-[0_2px_12px_rgba(79,70,229,0.35)] active:scale-95 transition-all flex items-center justify-center gap-1.5"
+              onClick={() => {
+                onClose();
+                onViewPatientDirectory(appointment.patient_id);
+              }}
+              className="text-xs font-medium text-[#6B6B6F] hover:text-[#1D1D1F] dark:hover:text-white flex items-center gap-1"
             >
-              <Send className="h-3.5 w-3.5" />
-              <span>Send Reminder</span>
+              <User className="h-3.5 w-3.5" />
+              <span>Full Patient History</span>
             </button>
 
-            <button
-              onClick={onNavigateToRecovery}
-              className="py-2.5 px-4 border border-rose-500/20 hover:bg-rose-500/10 text-rose-600 dark:text-rose-400 rounded-full text-xs font-bold active:scale-95 transition-all"
-            >
-              Slot Recovery
-            </button>
+            {prob >= 60 && (
+              <button
+                onClick={onNavigateToRecovery}
+                className="py-2 px-3.5 rounded-full text-xs font-medium text-[#C9685B] border border-[#C9685B]/20 hover:bg-[#C9685B]/10 transition-all flex items-center gap-1"
+              >
+                <span>View in Slot Recovery</span>
+                <ArrowRight className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
         </motion.div>
       </div>

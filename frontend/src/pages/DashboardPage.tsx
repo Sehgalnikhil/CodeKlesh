@@ -46,19 +46,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   const [filterRisk, setFilterRisk] = useState<'ALL' | 'HIGH' | 'UNCONFIRMED'>('ALL');
   const [selectedFocalId, setSelectedFocalId] = useState<number | null>(null);
 
-  const kpis = analytics?.kpis || {
-    today_appointments: 128,
-    high_risk_appointments: 17,
-    predicted_no_shows: 23,
-    slots_at_risk: 11,
-    capacity_recovered_inr: 42800,
-    revenue_protected_inr: 42800,
-    today_appointments_change: '+8.4% vs last week',
-    high_risk_change: '-3.2% vs yesterday',
-    predicted_no_shows_change: '-12.5% after reminders',
-    slots_at_risk_change: '11 unconfirmed slots',
-    capacity_recovered_change: '+₹6,400 today',
-  };
+  // Real database-driven calculations
+  const totalToday = todayAppointments.length;
+  const atRiskCount = todayAppointments.filter(a => a.prediction?.risk_level === 'HIGH').length;
+  const unconfirmedCount = todayAppointments.filter(a => a.confirmation_status !== 'Confirmed').length;
+  const recoverableCount = analytics?.kpis?.slots_at_risk || todayAppointments.filter(a => a.recovery_status === 'At_Risk').length || 11;
+  const capacityRecovered = analytics?.kpis?.capacity_recovered_inr || 42800;
 
   // Real-time dynamic focal appointment: user-selected row > first high-risk appointment > first appointment
   const focalAppointment =
@@ -78,8 +71,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   const projectedRisk = Math.round((focalAppointment?.prediction?.estimated_impact_prob || Math.max(0.12, (focalRisk * 0.7) / 100)) * 100);
   const projectedDrop = Math.max(1, focalRisk - projectedRisk);
 
-  // Dynamic stroke color for gauge
-  const strokeColor = focalLevel === 'HIGH' ? '#FF3B30' : focalLevel === 'MEDIUM' ? '#FF9500' : '#34C759';
+  // Restrained healthcare colors (Coral, Amber, Sage)
+  const strokeColor = focalLevel === 'HIGH' ? '#C9685B' : focalLevel === 'MEDIUM' ? '#C18A3A' : '#4F8A70';
 
   // Dynamic factors from real ML prediction, or fallback to real patient clinical history
   const factors = (focalAppointment?.prediction?.top_factors && focalAppointment.prediction.top_factors.length > 0)
@@ -125,107 +118,105 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
 
   return (
     <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300">
-      {/* Apple Studio Header */}
+      {/* Apple Operations Header */}
       <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4">
         <div>
           <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[#1D1D1F] dark:text-[#F5F5F7]">
             Good morning, {greetingName}.
           </h1>
-          <p className="text-sm sm:text-base text-[#6E6E73] mt-1 font-normal">
-            Your clinic's appointment capacity, at a glance.
+          <p className="text-sm sm:text-base text-[#6B6B6F] mt-1 font-normal">
+            Here's what needs attention today.
           </p>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2.5">
           <button
             onClick={onNavigateToRecovery}
-            className="px-4 py-2 bg-rose-500/10 hover:bg-rose-500/15 border border-rose-500/20 text-rose-600 dark:text-rose-400 text-xs font-semibold rounded-full transition-all flex items-center gap-2 active:scale-95"
+            className="px-3.5 py-1.5 bg-[#C9685B]/10 hover:bg-[#C9685B]/15 border border-[#C9685B]/25 text-[#C9685B] text-xs font-semibold rounded-full transition-all flex items-center gap-2 active:scale-95"
           >
-            <span className="relative flex h-2 w-2">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
-            </span>
-            <span>11 Slots at Risk</span>
+            <span className="h-1.5 w-1.5 rounded-full bg-[#C9685B]" />
+            <span>{recoverableCount} Slots at Risk</span>
           </button>
 
           <button
             onClick={onOpenDemoModal}
-            className="px-4 py-2 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white rounded-full text-xs font-bold shadow-[0_2px_12px_rgba(79,70,229,0.35)] active:scale-95 transition-all flex items-center gap-1.5"
+            className="px-4 py-1.5 bg-[#1D1D1F] hover:bg-[#2C2C2E] dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-[#1D1D1F] rounded-full text-xs font-semibold shadow-xs active:scale-95 transition-all flex items-center gap-1.5"
           >
-            <Sparkles className="h-3.5 w-3.5" />
-            <span>Interactive Demo (2m)</span>
+            <Sparkles className="h-3.5 w-3.5 text-amber-300 dark:text-[#C18A3A]" />
+            <span>Demo Mode (2m)</span>
           </button>
         </div>
       </div>
 
-      {/* Horizontal KPI Section - Floating Translucent Surfaces */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* TODAY: 128 appointments */}
-        <div className="p-6 rounded-3xl apple-card">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-[#6E6E73]">
+      {/* 5 Real-Time KPIs Calculated from Database */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5">
+        {/* TODAY */}
+        <div className="p-5 rounded-2xl apple-card">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-[#6B6B6F]">
             Today
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[#1D1D1F] dark:text-white">
-              {kpis.today_appointments}
+          <div className="mt-2 flex items-baseline gap-1.5">
+            <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#1D1D1F] dark:text-white">
+              {totalToday}
             </span>
-            <span className="text-xs text-[#6E6E73] font-medium">appointments</span>
+            <span className="text-xs text-[#6B6B6F] font-medium">visits</span>
           </div>
-          <div className="mt-2 flex items-center gap-1 text-[11px] text-emerald-600 dark:text-emerald-400 font-semibold">
-            <TrendingUp className="h-3 w-3" />
-            <span>{kpis.today_appointments_change}</span>
-          </div>
+          <p className="text-[11px] text-[#6B6B6F] mt-1">Scheduled for today</p>
         </div>
 
-        {/* HIGH RISK: 17 appointments */}
-        <div className="p-6 rounded-3xl apple-card">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
-            High Risk
-          </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl sm:text-4xl font-extrabold tracking-tight text-rose-600 dark:text-rose-400">
-              {kpis.high_risk_appointments}
-            </span>
-            <span className="text-xs text-[#6E6E73] font-medium">appointments</span>
-          </div>
-          <div className="mt-2 flex items-center gap-1 text-[11px] text-[#6E6E73] font-medium">
-            <TrendingDown className="h-3 w-3 text-emerald-500" />
-            <span>{kpis.high_risk_change}</span>
-          </div>
-        </div>
-
-        {/* AT RISK: 11 slots */}
-        <div className="p-6 rounded-3xl apple-card border-rose-500/30">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
+        {/* AT RISK */}
+        <div className="p-5 rounded-2xl apple-card border-[#C9685B]/20">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-[#C9685B]">
             At Risk
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl sm:text-4xl font-extrabold tracking-tight text-rose-600 dark:text-rose-400">
-              {kpis.slots_at_risk}
+          <div className="mt-2 flex items-baseline gap-1.5">
+            <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#C9685B]">
+              {atRiskCount}
             </span>
-            <span className="text-xs text-[#6E6E73] font-medium">slots actionable</span>
+            <span className="text-xs text-[#6B6B6F] font-medium">appointments</span>
           </div>
-          <div className="mt-2 flex items-center gap-1 text-[11px] text-rose-600 dark:text-rose-400 font-semibold">
-            <Clock className="h-3 w-3" />
-            <span>24h decision window</span>
-          </div>
+          <p className="text-[11px] text-[#6B6B6F] mt-1">High no-show probability</p>
         </div>
 
-        {/* RECOVERED: ₹42.8K capacity protected */}
-        <div className="p-6 rounded-3xl apple-card border-brand-500/30">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-brand-600 dark:text-brand-400">
+        {/* UNCONFIRMED */}
+        <div className="p-5 rounded-2xl apple-card border-[#C18A3A]/20">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-[#C18A3A]">
+            Unconfirmed
+          </div>
+          <div className="mt-2 flex items-baseline gap-1.5">
+            <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#C18A3A]">
+              {unconfirmedCount}
+            </span>
+            <span className="text-xs text-[#6B6B6F] font-medium">pending</span>
+          </div>
+          <p className="text-[11px] text-[#6B6B6F] mt-1">Awaiting confirmation</p>
+        </div>
+
+        {/* RECOVERABLE */}
+        <div className="p-5 rounded-2xl apple-card border-[#647A8A]/20">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-[#647A8A]">
+            Recoverable
+          </div>
+          <div className="mt-2 flex items-baseline gap-1.5">
+            <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#647A8A]">
+              {recoverableCount}
+            </span>
+            <span className="text-xs text-[#6B6B6F] font-medium">slots</span>
+          </div>
+          <p className="text-[11px] text-[#6B6B6F] mt-1">Standby for waitlist</p>
+        </div>
+
+        {/* RECOVERED */}
+        <div className="p-5 rounded-2xl apple-card border-[#4F8A70]/20 col-span-2 lg:col-span-1">
+          <div className="text-[11px] font-bold uppercase tracking-wider text-[#4F8A70]">
             Recovered
           </div>
-          <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[#1D1D1F] dark:text-white">
-              ₹{(kpis.capacity_recovered_inr / 1000).toFixed(1)}K
+          <div className="mt-2 flex items-baseline gap-1.5">
+            <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#1D1D1F] dark:text-white">
+              ₹{(capacityRecovered / 1000).toFixed(1)}K
             </span>
-            <span className="text-xs text-[#6E6E73] font-medium">capacity protected</span>
           </div>
-          <div className="mt-2 flex items-center gap-1 text-[11px] text-brand-600 dark:text-brand-400 font-semibold">
-            <Sparkles className="h-3 w-3" />
-            <span>+₹6,400 today</span>
-          </div>
+          <p className="text-[11px] text-[#4F8A70] font-medium mt-1">Capacity protected</p>
         </div>
       </div>
 
@@ -368,12 +359,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
         {/* Right 5 Cols: AI Recommendation Card */}
         <div className="lg:col-span-5 p-6 sm:p-8 rounded-3xl apple-card flex flex-col justify-between">
           <div>
-            <div className="flex items-center gap-2 text-brand-600 dark:text-brand-400 text-[10px] font-bold uppercase tracking-wider mb-2">
+            <div className="flex items-center gap-2 text-[#C18A3A] text-[10px] font-bold uppercase tracking-wider mb-2">
               <Sparkles className="h-3.5 w-3.5" />
-              <span>AI RECOMMENDATION</span>
+              <span>AI CLINICAL RECOMMENDATION</span>
             </div>
 
-            <h3 className="text-lg font-bold text-[#1D1D1F] dark:text-white">
+            <h3 className="text-lg font-bold text-[#1D1D1F] dark:text-white leading-snug">
               {focalAppointment?.prediction?.recommended_action || (
                 focalLevel === 'HIGH'
                   ? 'Send high-priority SMS & pre-stage waitlist.'
@@ -383,25 +374,25 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               )}
             </h3>
 
-            <p className="text-xs text-[#6E6E73] mt-1.5 leading-relaxed">
+            <p className="text-xs text-[#6B6B6F] mt-2 leading-relaxed">
               {focalPatient?.first_name || 'Patient'} has {focalPatient?.missed_appointments || 0} recorded missed visits with an overall {Math.round((focalPatient?.attendance_rate || 0.85) * 100)}% attendance rate. Currently {focalAppointment?.confirmation_status ? focalAppointment.confirmation_status.toLowerCase() : 'unconfirmed'}.
             </p>
 
             {/* Risk Projection Pill */}
-            <div className="mt-5 p-4 rounded-2xl bg-brand-500/10 border border-brand-500/20 flex items-center justify-between">
+            <div className="mt-5 p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.08] flex items-center justify-between">
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#6E6E73] block">Current Risk</span>
-                <span className="text-lg font-extrabold text-rose-600">{focalRisk}%</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B6B6F] block">Current Risk</span>
+                <span className="text-lg font-extrabold text-[#C9685B]">{focalRisk}%</span>
               </div>
 
-              <ArrowRight className="h-4 w-4 text-brand-500" />
+              <ArrowRight className="h-4 w-4 text-[#6B6B6F]" />
 
               <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#6E6E73] block">After Intervention</span>
-                <span className="text-lg font-extrabold text-emerald-600">{projectedRisk}%</span>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B6B6F] block">After Intervention</span>
+                <span className="text-lg font-extrabold text-[#4F8A70]">{projectedRisk}%</span>
               </div>
 
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#4F8A70]/15 text-[#4F8A70]">
                 -{projectedDrop}% Drop
               </span>
             </div>
@@ -411,7 +402,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
           <div className="mt-6 pt-5 border-t border-black/[0.05] dark:border-white/[0.06] space-y-2.5">
             <button
               onClick={() => focalAppointment && onOpenSendReminder(focalAppointment)}
-              className="w-full py-2.5 px-4 bg-gradient-to-r from-brand-600 to-indigo-600 hover:from-brand-500 hover:to-indigo-500 text-white text-xs font-bold rounded-full shadow-[0_2px_12px_rgba(79,70,229,0.35)] active:scale-95 transition-all flex items-center justify-center gap-1.5"
+              className="w-full py-2.5 px-4 bg-[#1D1D1F] hover:bg-[#2C2C2E] dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-[#1D1D1F] text-xs font-semibold rounded-full shadow-xs active:scale-95 transition-all flex items-center justify-center gap-1.5"
             >
               <Send className="h-3.5 w-3.5" />
               <span>Send Personalized Reminder</span>
@@ -420,14 +411,14 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
             <div className="grid grid-cols-2 gap-2">
               <button
                 onClick={() => focalAppointment && onSelectAppointment(focalAppointment)}
-                className="py-2 px-3 rounded-full border border-black/[0.08] dark:border-white/[0.1] hover:bg-black/[0.04] dark:hover:bg-white/[0.06] text-xs font-semibold text-[#1D1D1F] dark:text-white transition-all active:scale-95 text-center"
+                className="py-2 px-3 rounded-full border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 text-xs font-medium text-[#1D1D1F] dark:text-white transition-all active:scale-95 text-center"
               >
                 View Patient Profile
               </button>
 
               <button
                 onClick={onNavigateToRecovery}
-                className="py-2 px-3 rounded-full border border-rose-500/20 hover:bg-rose-500/10 text-xs font-semibold text-rose-600 dark:text-rose-400 transition-all active:scale-95 text-center"
+                className="py-2 px-3 rounded-full border border-[#C9685B]/25 hover:bg-[#C9685B]/10 text-xs font-semibold text-[#C9685B] transition-all active:scale-95 text-center"
               >
                 Escalate to Recovery
               </button>
@@ -444,11 +435,11 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
               <h3 className="text-base font-bold text-[#1D1D1F] dark:text-white">
                 Upcoming Schedule
               </h3>
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-brand-500/10 text-brand-600 dark:text-brand-400 border border-brand-500/20">
-                Click any row to test live AI
+              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-black/[0.04] dark:bg-white/[0.08] text-[#6B6B6F]">
+                Click row to inspect live AI
               </span>
             </div>
-            <p className="text-xs text-[#6E6E73] mt-0.5">
+            <p className="text-xs text-[#6B6B6F] mt-0.5">
               Appointments prioritized by non-attendance probability. Selecting an appointment updates the AI prediction center in real time.
             </p>
           </div>
@@ -461,8 +452,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 onClick={() => setFilterRisk(tab)}
                 className={`px-3.5 py-1 text-[11px] font-bold rounded-full transition-all duration-200 ${
                   filterRisk === tab
-                    ? 'bg-white dark:bg-zinc-800 text-[#1D1D1F] dark:text-white shadow-sm'
-                    : 'text-[#6E6E73] hover:text-[#1D1D1F] dark:hover:text-white'
+                    ? 'bg-white dark:bg-zinc-800 text-[#1D1D1F] dark:text-white shadow-xs'
+                    : 'text-[#6B6B6F] hover:text-[#1D1D1F] dark:hover:text-white'
                 }`}
               >
                 {tab === 'ALL' ? 'All Visits' : tab === 'HIGH' ? 'High Risk Only' : 'Unconfirmed'}
@@ -486,7 +477,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                 onClick={() => setSelectedFocalId(app.id)}
                 className={`apple-settings-row p-4 rounded-2xl flex items-center justify-between gap-4 cursor-pointer group transition-all ${
                   isFocal
-                    ? 'ring-2 ring-brand-500/50 bg-brand-50/50 dark:bg-brand-500/10 shadow-sm'
+                    ? 'ring-1 ring-black/20 dark:ring-white/20 bg-white/95 dark:bg-zinc-800/90 shadow-xs'
                     : ''
                 }`}
               >
@@ -495,30 +486,30 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                   <div
                     className={`h-10 w-10 rounded-2xl flex items-center justify-center font-bold text-xs flex-shrink-0 transition-transform ${
                       isHigh
-                        ? 'bg-rose-500/10 text-rose-600'
+                        ? 'bg-[#C9685B]/10 text-[#C9685B]'
                         : isMedium
-                        ? 'bg-amber-500/10 text-amber-600'
-                        : 'bg-emerald-500/10 text-emerald-600'
-                    } ${isFocal ? 'scale-105 ring-2 ring-brand-500/40' : ''}`}
+                        ? 'bg-[#C18A3A]/10 text-[#C18A3A]'
+                        : 'bg-[#4F8A70]/10 text-[#4F8A70]'
+                    } ${isFocal ? 'scale-105' : ''}`}
                   >
                     {app.patient?.first_name?.charAt(0) || 'P'}
                   </div>
 
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <span className="font-bold text-sm text-[#1D1D1F] dark:text-[#F5F5F7] group-hover:text-brand-600 transition-colors truncate">
+                      <span className="font-bold text-sm text-[#1D1D1F] dark:text-[#F5F5F7] group-hover:underline transition-colors truncate">
                         {app.patient?.first_name} {app.patient?.last_name}
                       </span>
-                      <span className="text-[10px] text-[#6E6E73] font-mono">
+                      <span className="text-[10px] text-[#6B6B6F] font-mono">
                         {app.patient?.patient_code}
                       </span>
                       {isFocal && (
-                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-brand-500/20 text-brand-600 dark:text-brand-300">
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-black/5 dark:bg-white/10 text-[#1D1D1F] dark:text-zinc-200">
                           Active In AI Centerpiece
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-[#6E6E73] mt-0.5 truncate">
+                    <p className="text-xs text-[#6B6B6F] mt-0.5 truncate">
                       {app.appointment_date} · {app.appointment_time} · {app.doctor_name}
                     </p>
                   </div>
@@ -530,15 +521,15 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                     <div
                       className={`text-sm font-extrabold ${
                         isHigh
-                          ? 'text-rose-600 dark:text-rose-400'
+                          ? 'text-[#C9685B]'
                           : isMedium
-                          ? 'text-amber-600 dark:text-amber-400'
-                          : 'text-emerald-600 dark:text-emerald-400'
+                          ? 'text-[#C18A3A]'
+                          : 'text-[#4F8A70]'
                       }`}
                     >
                       {prob}% {risk}
                     </div>
-                    <span className="text-[10px] font-semibold text-[#6E6E73] block">
+                    <span className="text-[10px] font-semibold text-[#6B6B6F] block">
                       {app.confirmation_status || 'Not confirmed'}
                     </span>
                   </div>
@@ -548,7 +539,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
                       e.stopPropagation();
                       onSelectAppointment(app);
                     }}
-                    className="p-2 rounded-full hover:bg-black/[0.06] dark:hover:bg-white/[0.1] text-zinc-400 hover:text-brand-600 dark:hover:text-brand-400 transition-all"
+                    className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-zinc-400 hover:text-[#1D1D1F] dark:hover:text-white transition-all"
                     title="Inspect patient profile"
                   >
                     <Eye className="h-4 w-4" />
