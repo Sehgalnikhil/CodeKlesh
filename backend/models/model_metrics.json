@@ -1,0 +1,113 @@
+{
+  "model_name": "Random Forest Clinical Risk Ensemble",
+  "accuracy": 0.7192,
+  "precision": 0.6509,
+  "recall": 0.7875,
+  "f1_score": 0.7127,
+  "roc_auc": 0.7928,
+  "confusion_matrix": [
+    [
+      1484,
+      747
+    ],
+    [
+      376,
+      1393
+    ]
+  ],
+  "feature_importances": [
+    {
+      "feature": "previous_attendance_rate",
+      "label": "Historical Attendance Rate",
+      "importance": 0.2727,
+      "percentage": 27.3,
+      "rank": 1
+    },
+    {
+      "feature": "previous_no_shows",
+      "label": "Previous Missed Appointments",
+      "importance": 0.2538,
+      "percentage": 25.4,
+      "rank": 2
+    },
+    {
+      "feature": "days_in_advance",
+      "label": "Booking-to-Appointment Lead Time",
+      "importance": 0.1295,
+      "percentage": 12.9,
+      "rank": 3
+    },
+    {
+      "feature": "distance_km",
+      "label": "Distance to Clinic",
+      "importance": 0.1032,
+      "percentage": 10.3,
+      "rank": 4
+    },
+    {
+      "feature": "age",
+      "label": "Patient Age Bracket",
+      "importance": 0.0992,
+      "percentage": 9.9,
+      "rank": 5
+    },
+    {
+      "feature": "sms_reminder_sent",
+      "label": "SMS Reminder Delivered",
+      "importance": 0.0439,
+      "percentage": 4.4,
+      "rank": 6
+    },
+    {
+      "feature": "is_specialist",
+      "label": "Specialist Consultation",
+      "importance": 0.016,
+      "percentage": 1.6,
+      "rank": 7
+    },
+    {
+      "feature": "is_monday_or_friday",
+      "label": "Day of Week (Monday/Friday)",
+      "importance": 0.0151,
+      "percentage": 1.5,
+      "rank": 8
+    },
+    {
+      "feature": "is_routine_followup",
+      "label": "Routine Follow-up Type",
+      "importance": 0.015,
+      "percentage": 1.5,
+      "rank": 9
+    },
+    {
+      "feature": "is_early_morning",
+      "label": "Early Morning Time Slot (<9:30 AM)",
+      "importance": 0.0145,
+      "percentage": 1.4,
+      "rank": 10
+    },
+    {
+      "feature": "is_female",
+      "label": "Demographics",
+      "importance": 0.0143,
+      "percentage": 1.4,
+      "rank": 11
+    },
+    {
+      "feature": "chronic_condition",
+      "label": "Chronic Condition Managed",
+      "importance": 0.0119,
+      "percentage": 1.2,
+      "rank": 12
+    },
+    {
+      "feature": "is_late_afternoon",
+      "label": "Late Afternoon Slot (>3:30 PM)",
+      "importance": 0.0109,
+      "percentage": 1.1,
+      "rank": 13
+    }
+  ],
+  "total_test_samples": 4000,
+  "no_show_prevalence": 0.442
+}
