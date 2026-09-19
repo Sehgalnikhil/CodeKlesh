@@ -48,13 +48,38 @@ def dispatch_reminder(
     auth_token = os.getenv("TWILIO_AUTH_TOKEN", "").strip()
     from_phone = os.getenv("TWILIO_PHONE_NUMBER", "").strip()
 
+    # 1. Check Local Baileys WhatsApp Gateway for automated delivery
+    clean_to = patient.phone.strip().replace(" ", "").replace("-", "")
+    if not clean_to.startswith("+"):
+        clean_to = f"+91{clean_to.lstrip('0')}"
+
+    if reminder_in.channel == "WhatsApp":
+        wa_body = (
+            f"🏥 *SlotSure Clinic Appointment Confirmation*\n\n"
+            f"Hello *{patient.first_name} {patient.last_name}*, you have an upcoming consultation:\n"
+            f"👨‍⚕️ *Doctor:* {appointment.doctor_name} ({appointment.department})\n"
+            f"📅 *Date:* {appointment.appointment_date}\n"
+            f"⏰ *Time:* {appointment.appointment_time}\n\n"
+            f"Please reply *1* to CONFIRM or *2* to RESCHEDULE.\n"
+            f"_SlotSure Healthcare Engine_"
+        )
+        try:
+            import requests
+            gw_res = requests.post(
+                "http://127.0.0.1:5005/send",
+                json={"phone": clean_to, "message": wa_body},
+                timeout=3
+            )
+            if gw_res.status_code == 200 and gw_res.json().get("success"):
+                notes += " (Dispatched via Local WhatsApp Web Gateway)"
+        except Exception:
+            pass
+
+    # 2. Check Twilio Carrier (SMS or WhatsApp Sandbox fallback)
     if account_sid and auth_token:
         try:
             from twilio.rest import Client
             client = Client(account_sid, auth_token)
-            clean_to = patient.phone.strip().replace(" ", "").replace("-", "")
-            if not clean_to.startswith("+"):
-                clean_to = f"+91{clean_to.lstrip('0')}"
 
             if reminder_in.channel == "SMS" and from_phone:
                 sms_body = (
@@ -65,17 +90,7 @@ def dispatch_reminder(
                 client.messages.create(to=clean_to, from_=from_phone, body=sms_body)
                 notes += " (Dispatched via Twilio SMS carrier)"
 
-            elif reminder_in.channel == "WhatsApp":
-                wa_body = (
-                    f"🏥 *SlotSure Clinic Appointment Confirmation*\n\n"
-                    f"Hello *{patient.first_name} {patient.last_name}*, you have an upcoming consultation:\n"
-                    f"👨‍⚕️ *Doctor:* {appointment.doctor_name} ({appointment.department})\n"
-                    f"📅 *Date:* {appointment.appointment_date}\n"
-                    f"⏰ *Time:* {appointment.appointment_time}\n\n"
-                    f"Please reply *1* to CONFIRM or *2* to RESCHEDULE.\n"
-                    f"_SlotSure Healthcare Engine_"
-                )
-                # Attempt Twilio WhatsApp sandbox/sender
+            elif reminder_in.channel == "WhatsApp" and "Local WhatsApp" not in notes:
                 try:
                     client.messages.create(to=f"whatsapp:{clean_to}", from_="whatsapp:+14155238886", body=wa_body)
                     notes += " (Dispatched via Twilio WhatsApp Gateway)"
