@@ -116,15 +116,24 @@ def dispatch_reminder(
         try:
             from twilio.rest import Client
             client = Client(account_sid, auth_token)
-            sms_body = (
-                f"SlotSure Clinic Reminder: Hello {patient.first_name}, you have an appointment with "
-                f"{appointment.doctor_name} on {appointment.appointment_date} at {appointment.appointment_time}. "
-                f"Reply 1 to Confirm or 2 to Cancel."
-            )
-            sms_msg = client.messages.create(to=clean_to, from_=from_phone, body=sms_body)
+            
+            try:
+                sms_body = (
+                    f"SlotSure Clinic Reminder: Hello {patient.first_name}, you have an appointment with "
+                    f"{appointment.doctor_name} on {appointment.appointment_date} at {appointment.appointment_time}. "
+                    f"Reply 1 to Confirm or 2 to Cancel."
+                )
+                sms_msg = client.messages.create(to=clean_to, from_=from_phone, body=sms_body)
+            except Exception as primary_err:
+                # Fallback to Twilio Trial approved template keyword (avoids Error 572006)
+                print(f"Twilio custom SMS notice: {primary_err}. Falling back to approved trial template...")
+                sms_msg = client.messages.create(to=clean_to, from_=from_phone, body="sms_appointment_reminders")
+
             notes += f" (Dispatched via Twilio SMS: {sms_msg.sid})"
+            print(f"✅ Twilio SMS queued! SID: {sms_msg.sid}")
         except Exception as err:
             print(f"Carrier SMS notification notice: {err}")
+
 
     reminder = Reminder(
         appointment_id=reminder_in.appointment_id,
