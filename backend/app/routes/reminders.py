@@ -1,6 +1,8 @@
+import json
+import os
 from datetime import datetime
 from typing import List
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.orm import Session, joinedload
 from ..database import get_db
 from ..models import Reminder, Appointment, Patient, Prediction
@@ -66,14 +68,22 @@ def dispatch_reminder(
             try:
                 from twilio.rest import Client
                 client = Client(account_sid, auth_token)
+                
+                # Format friendly date/time for template variables
+                # Template body: "Reminder: Appt {{1}}, {{2}}. Reply C to confirm or R to reschedule. Test message from Twilio."
+                date_label = str(appointment.appointment_date)
+                time_label = str(appointment.appointment_time)
+                content_vars = json.dumps({"1": date_label, "2": time_label})
+
                 msg = client.messages.create(
                     to=f"whatsapp:{clean_to}",
                     from_=twilio_wa_from,
-                    content_sid=twilio_wa_content_sid
+                    content_sid=twilio_wa_content_sid,
+                    content_variables=content_vars
                 )
                 notes += f" (Dispatched via Twilio WhatsApp: {msg.sid})"
                 dispatched_wa = True
-                print(f"✅ Twilio WhatsApp message queued! SID: {msg.sid}")
+                print(f"✅ Twilio WhatsApp message queued! SID: {msg.sid} with variables ({date_label}, {time_label})")
             except Exception as tw_err:
                 print(f"Twilio WhatsApp template notice: {tw_err}")
 
@@ -116,7 +126,6 @@ def dispatch_reminder(
         except Exception as err:
             print(f"Carrier SMS notification notice: {err}")
 
-
     reminder = Reminder(
         appointment_id=reminder_in.appointment_id,
         patient_id=reminder_in.patient_id,
@@ -130,3 +139,79 @@ def dispatch_reminder(
     db.commit()
     db.refresh(reminder)
     return reminder
+
+@router.post("/whatsapp/incoming")
+async def incoming_whatsapp_reply(request: Request, db: Session = Depends(get_db)):
+    """
+    Twilio Webhook for incoming WhatsApp replies.
+    When patient replies 'C' (Confirm) or 'R' (Reschedule),
+    SlotSure updates the appointment in DB and returns an instant confirmation/cancellation response message!
+    """
+    form_data = await request.form()
+    from_wa = form_data.get("From", "") # e.g. "whatsapp:+917027635901"
+    body = (form_data.get("Body") or "").strip()
+
+    print(f"📩 Incoming WhatsApp reply from {from_wa}: '{body}'")
+
+    raw_digits = "".join(filter(str.isdigit, from_wa))
+    last_10 = raw_digits[-10:] if len(raw_digits) >= 10 else raw_digits
+
+    # Look up patient by phone
+    patient = db.query(Patient).filter(
+        (Patient.phone.contains(last_10)) | (Patient.phone == from_wa.replace("whatsapp:", ""))
+    ).first()
+
+    latest_appt = None
+    if patient:
+        latest_appt = db.query(Appointment).filter(
+            Appointment.patient_id == patient.id
+        ).order_by(Appointment.id.desc()).first()
+
+    text_lower = body.lower().strip()
+    is_confirm = text_lower in ["c", "1", "confirm", "yes", "confirmed", "y"] or "confirm" in text_lower
+    is_reschedule = text_lower in ["r", "2", "reschedule", "cancel", "no", "cancelled", "n"] or "reschedule" in text_lower or "cancel" in text_lower
+
+    patient_name = patient.first_name if patient else "Patient"
+    doctor_name = latest_appt.doctor_name if latest_appt else "your doctor"
+    appt_date = latest_appt.appointment_date if latest_appt else "your appointment date"
+    appt_time = latest_appt.appointment_time if latest_appt else "scheduled time"
+
+    if is_confirm:
+        if latest_appt:
+            latest_appt.confirmation_status = "Confirmed"
+            if latest_appt.prediction:
+                latest_appt.prediction.risk_level = "LOW"
+                latest_appt.prediction.risk_probability = 0.12
+            db.commit()
+
+        reply_message = (
+            f"🏥 *SlotSure Clinic* ✅\n\n"
+            f"Thank you *{patient_name}*! Your appointment with *{doctor_name}* on *{appt_date}* at *{appt_time}* has been successfully *CONFIRMED*.\n\n"
+            f"📍 *Location:* SlotSure Central Clinic\n"
+            f"We look forward to seeing you!"
+        )
+    elif is_reschedule:
+        if latest_appt:
+            latest_appt.confirmation_status = "Cancelled"
+            latest_appt.recovery_status = "Recovery Queued"
+            db.commit()
+
+        reply_message = (
+            f"🏥 *SlotSure Clinic* 🗓️\n\n"
+            f"Hello *{patient_name}*, your appointment with *{doctor_name}* has been *CANCELLED* and queued for rescheduling.\n\n"
+            f"Our clinical coordinator will reach out shortly with upcoming openings."
+        )
+    else:
+        reply_message = (
+            f"🏥 *SlotSure Clinic*\n\n"
+            f"Hello *{patient_name}*, please reply with:\n"
+            f"1️⃣ Reply *C* (or *1*) to *CONFIRM*\n"
+            f"2️⃣ Reply *R* (or *2*) to *RESCHEDULE*"
+        )
+
+    twiml = f"""<?xml version="1.0" encoding="UTF-8"?>
+<Response>
+    <Message>{reply_message}</Message>
+</Response>"""
+    return Response(content=twiml, media_type="application/xml")
+

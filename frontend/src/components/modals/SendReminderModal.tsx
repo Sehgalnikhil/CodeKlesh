@@ -314,15 +314,15 @@ _SlotSure Healthcare Engine_`;
                 </div>
 
                 {/* Preview Box */}
-                <div className="p-3 bg-emerald-50/30 dark:bg-white/[0.02] border border-emerald-200/70 dark:border-white/[0.08] rounded-xl space-y-1.5">
+                <div className="p-3 bg-emerald-50/30 dark:bg-white/[0.02] border border-emerald-200/70 dark:border-white/[0.08] rounded-xl space-y-2">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-semibold text-emerald-900 dark:text-emerald-300 flex items-center gap-1">
                       <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
-                      <span>Message Preview</span>
+                      <span>WhatsApp Template Preview</span>
                     </span>
                     <button
                       type="button"
-                      onClick={() => copyText(whatsappMessage)}
+                      onClick={() => copyText(`Reminder: Appt ${appointment.appointment_date}, ${appointment.appointment_time}. Reply C to confirm or R to reschedule.`)}
                       className="text-[11px] text-emerald-700 hover:text-emerald-900 font-medium flex items-center gap-1 cursor-pointer"
                     >
                       {hasCopied ? <CheckCheck className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
@@ -330,10 +330,26 @@ _SlotSure Healthcare Engine_`;
                     </button>
                   </div>
 
-                  <div className="p-2.5 bg-white dark:bg-zinc-900 border border-emerald-200/60 dark:border-white/[0.08] rounded-lg text-xs text-[#1D1D1F] dark:text-zinc-200 font-mono whitespace-pre-wrap leading-relaxed max-h-36 overflow-y-auto">
-                    {whatsappMessage}
+                  <div className="p-2.5 bg-white dark:bg-zinc-900 border border-emerald-200/60 dark:border-white/[0.08] rounded-lg text-xs text-[#1D1D1F] dark:text-zinc-200 font-mono leading-relaxed">
+                    Reminder: Appt <span className="text-emerald-700 font-bold">{appointment.appointment_date}</span>, <span className="text-emerald-700 font-bold">{appointment.appointment_time}</span>. Reply <span className="font-bold text-emerald-800">C</span> to confirm or <span className="font-bold text-amber-800">R</span> to reschedule.
+                  </div>
+
+                  {/* 2 Interactive Options Explanation */}
+                  <div className="p-2 bg-emerald-100/50 dark:bg-emerald-950/40 rounded-lg text-[11px] text-emerald-900 dark:text-emerald-300 space-y-1">
+                    <div className="font-semibold text-[10px] text-emerald-800 dark:text-emerald-400 uppercase tracking-wide">
+                      Automated 2-Way Reply Actions:
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-emerald-700 font-mono bg-white dark:bg-zinc-800 px-1 rounded border border-emerald-300">Reply C</span>
+                      <span>Confirms visit & returns instant confirmation receipt</span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-bold text-amber-700 font-mono bg-white dark:bg-zinc-800 px-1 rounded border border-amber-300">Reply R</span>
+                      <span>Cancels visit & automatically triggers slot recovery</span>
+                    </div>
                   </div>
                 </div>
+
               </motion.div>
             )}
 

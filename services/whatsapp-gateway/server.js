@@ -123,6 +123,27 @@ async function startWhatsApp() {
               msg.message.extendedTextMessage?.text ||
               '';
             console.log(`📩 Received WhatsApp reply from +${sender}: "${text}"`);
+
+            const cleanText = text.trim().toLowerCase();
+            if (cleanText === '1' || cleanText === 'c' || cleanText.includes('confirm') || cleanText.includes('yes')) {
+              try {
+                await sock.sendMessage(msg.key.remoteJid, {
+                  text: '🏥 *SlotSure Clinic* ✅\n\nThank you! Your appointment attendance has been successfully *CONFIRMED*.\n\n📍 *Location:* SlotSure Central Clinic\nWe look forward to seeing you!'
+                });
+                console.log(`📤 Auto-replied confirmation to +${sender}`);
+              } catch (e) {
+                console.error('Error auto-replying confirmation:', e);
+              }
+            } else if (cleanText === '2' || cleanText === 'r' || cleanText.includes('reschedule') || cleanText.includes('cancel')) {
+              try {
+                await sock.sendMessage(msg.key.remoteJid, {
+                  text: '🏥 *SlotSure Clinic* 🗓️\n\nYour appointment has been marked for *RESCHEDULING* and queued for slot recovery.\n\nOur clinic coordination desk will contact you shortly with upcoming openings.'
+                });
+                console.log(`📤 Auto-replied reschedule/cancellation to +${sender}`);
+              } catch (e) {
+                console.error('Error auto-replying reschedule:', e);
+              }
+            }
           }
         }
       }
