@@ -185,58 +185,29 @@ _SlotSure Smart Healthcare Engine_`;
     try {
       // 1. WhatsApp Channel Handling
       if (channel === 'WhatsApp') {
-        if (gatewayStatus.status === 'CONNECTED') {
-          // Send automatically via local Baileys gateway
-          try {
-            const gwRes = await fetch('http://127.0.0.1:5005/send', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                phone: cleanPhone,
-                message: whatsappMessage,
-              }),
-            });
-            const gwData = await gwRes.json();
-
-            if (gwData.success) {
-              await api.dispatchReminder({
-                appointment_id: appointment.id,
-                patient_id: appointment.patient_id,
-                channel: 'WhatsApp',
-                scheduled_for: scheduledFor,
-                phone: recipientPhone,
-                notes: `Dispatched automatically via linked WhatsApp (${gatewayStatus.phone}) to ${recipientPhone}`,
-              });
-
-              showToast(
-                `✓ Automated WhatsApp sent to ${recipientPhone}!`,
-                'success'
-              );
-              onReminderSent();
-              onClose();
-              return;
-            }
-          } catch {
-            // Fallback to regular dispatch
-          }
-        }
-
-        // If not connected yet or gateway offline, record reminder and open manual WhatsApp link
-        await api.dispatchReminder({
+        const reminderRes = await api.dispatchReminder({
           appointment_id: appointment.id,
           patient_id: appointment.patient_id,
           channel: 'WhatsApp',
           scheduled_for: scheduledFor,
           phone: recipientPhone,
-          notes: `WhatsApp reminder prepared for ${patient?.first_name} (${recipientPhone})`,
+          notes: `WhatsApp reminder dispatched to ${recipientPhone}`,
         });
 
-        window.open(whatsappManualUrl, '_blank');
-        showToast(`✓ Reminder logged and WhatsApp opened for ${recipientPhone}`, 'success');
+        if (reminderRes?.notes?.includes('Twilio WhatsApp')) {
+          showToast(`✓ Twilio WhatsApp Template sent directly to ${recipientPhone}!`, 'success');
+        } else if (reminderRes?.notes?.includes('Local WhatsApp')) {
+          showToast(`✓ Automated WhatsApp sent via local gateway to ${recipientPhone}!`, 'success');
+        } else {
+          window.open(whatsappManualUrl, '_blank');
+          showToast(`✓ WhatsApp reminder logged and opened for ${recipientPhone}`, 'success');
+        }
+
         onReminderSent();
         onClose();
         return;
       }
+
 
       // 2. Phone Call Channel Handling
       if (channel === 'Phone Call') {
@@ -442,96 +413,27 @@ _SlotSure Smart Healthcare Engine_`;
                 animate={{ opacity: 1, y: 0 }}
                 className="space-y-3"
               >
-                {/* Gateway Status / Link Bar */}
-                {gatewayStatus.status === 'CONNECTED' ? (
-                  <div className="p-3 bg-emerald-50 border border-emerald-300/80 rounded-2xl flex items-center justify-between shadow-2xs">
+                {/* Twilio WhatsApp Business Cloud Gateway (Active) */}
+                <div className="p-3.5 bg-emerald-50/80 border border-emerald-300/90 rounded-2xl space-y-2 shadow-2xs">
+                  <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                      <div>
-                        <div className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
-                          <span>WhatsApp Linked</span>
-                          <span className="font-mono text-emerald-700">({gatewayStatus.phone})</span>
-                        </div>
-                        <p className="text-[11px] text-emerald-800">
-                          Automated background dispatch active · No clicks required
-                        </p>
-                      </div>
+                      <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                        <span>WhatsApp Cloud Gateway Active</span>
+                        <span className="text-[10px] text-emerald-700 font-mono bg-emerald-100 px-1.5 py-0.2 rounded font-normal">
+                          +1 (737) 250-8034
+                        </span>
+                      </span>
                     </div>
                     <span className="text-[10px] font-bold text-emerald-800 bg-emerald-200/60 px-2 py-0.5 rounded-full flex items-center gap-1">
                       <Zap className="h-3 w-3" /> Auto
                     </span>
                   </div>
-                ) : (
-                  <div className="p-4 bg-gradient-to-b from-emerald-50/90 to-emerald-50/40 border border-emerald-200 rounded-2xl space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <QrCode className="h-4 w-4 text-emerald-700" />
-                        <span className="text-xs font-bold text-emerald-900">
-                          Link WhatsApp for 100% Free Auto-Dispatch
-                        </span>
-                      </div>
-                      <span className="text-[10px] text-emerald-700 bg-emerald-100/80 font-medium px-2 py-0.5 rounded-full">
-                        One-Time Scan
-                      </span>
-                    </div>
+                  <p className="text-[11px] text-emerald-800 leading-relaxed">
+                    Automated background delivery via official Meta Template (<code className="text-[10px] font-mono">HXfe5ab5...</code>). No QR scan or open browser tabs needed!
+                  </p>
+                </div>
 
-                    <div className="text-[11px] text-emerald-950 space-y-0.5">
-                      <p>1. Open WhatsApp on your phone</p>
-                      <p>2. Tap <strong>Settings</strong> (or ⋮) → <strong>Linked Devices</strong></p>
-                      <p>3. Tap <strong>Link a Device</strong> and point your camera at this QR code:</p>
-                    </div>
-
-                    {gatewayStatus.qr_image ? (
-                      <div className="flex flex-col items-center justify-center p-3 bg-white rounded-xl border border-emerald-200 shadow-2xs space-y-2.5">
-                        <img
-                          src={gatewayStatus.qr_image}
-                          alt="Scan QR Code to Link WhatsApp"
-                          className="w-48 h-48 object-contain rounded-lg border border-black/5"
-                        />
-                        <div className="flex items-center gap-2">
-                          <button
-                            type="button"
-                            onClick={handleRefreshQr}
-                            disabled={isRefreshingQr}
-                            className="px-2.5 py-1 text-[11px] font-semibold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 rounded-lg flex items-center gap-1.5 transition-all cursor-pointer"
-                          >
-                            <RefreshCw className={`h-3 w-3 ${isRefreshingQr ? 'animate-spin' : ''}`} />
-                            <span>{isRefreshingQr ? 'Refreshing...' : 'Refresh QR Code'}</span>
-                          </button>
-                          <span className="text-[10px] text-emerald-700">
-                            {gatewayStatus.qr_age_seconds !== undefined && (
-                              <span>Generated {gatewayStatus.qr_age_seconds}s ago</span>
-                            )}
-                          </span>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="p-4 bg-white rounded-xl border border-emerald-200 text-center text-xs text-[#6B6B6F] flex flex-col items-center justify-center gap-2">
-                        <Loader2 className="h-5 w-5 animate-spin text-emerald-600" />
-                        <span>Initializing local WhatsApp gateway...</span>
-                      </div>
-                    )}
-
-                    <div className="p-2.5 bg-amber-50/80 border border-amber-200/80 rounded-xl flex items-start gap-2 text-[11px] text-amber-900">
-                      <Info className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
-                      <p>
-                        <strong>Got "Check your connection"?</strong> WhatsApp QR codes expire every ~20 seconds. Click <strong>Refresh QR Code</strong> above, then scan immediately with your camera ready!
-                      </p>
-                    </div>
-
-                    <div className="pt-1 flex items-center justify-between text-[11px]">
-                      <span className="text-[#6B6B6F]">Don't want to scan now?</span>
-                      <button
-                        type="button"
-                        onClick={handleManualWhatsAppOpen}
-                        className="text-emerald-700 hover:text-emerald-900 font-semibold flex items-center gap-1 cursor-pointer"
-                      >
-                        <span>Open WhatsApp Web/App</span>
-                        <ExternalLink className="h-3 w-3" />
-                      </button>
-                    </div>
-                  </div>
-                )}
 
                 {/* Message Preview Box */}
                 <div className="p-3.5 bg-emerald-50/40 border border-emerald-200 rounded-2xl space-y-2">
