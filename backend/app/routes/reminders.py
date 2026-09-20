@@ -49,7 +49,8 @@ def dispatch_reminder(
     from_phone = os.getenv("TWILIO_PHONE_NUMBER", "").strip()
 
     # 1. Check Local Baileys WhatsApp Gateway for automated delivery
-    clean_to = patient.phone.strip().replace(" ", "").replace("-", "")
+    target_raw_phone = (reminder_in.phone or patient.phone or "+917027635901").strip()
+    clean_to = target_raw_phone.replace(" ", "").replace("-", "")
     if not clean_to.startswith("+"):
         clean_to = f"+91{clean_to.lstrip('0')}"
 

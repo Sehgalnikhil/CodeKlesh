@@ -189,7 +189,6 @@ class AppointmentResponse(BaseModel):
     class Config:
         from_attributes = True
 
-# --- Reminder Schemas ---
 class ReminderCreate(BaseModel):
     appointment_id: int
     patient_id: int
@@ -197,7 +196,7 @@ class ReminderCreate(BaseModel):
     strategy: Optional[str] = "Standard Reminder"
     scheduled_for: str = "24 hours before appointment"
     notes: Optional[str] = None
-
+    phone: Optional[str] = None
 class ReminderResponse(BaseModel):
     id: int
     appointment_id: int

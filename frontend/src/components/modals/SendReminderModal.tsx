@@ -16,7 +16,9 @@ import {
   QrCode,
   RefreshCw,
   Zap,
-  Info
+  Info,
+  Edit3,
+  RotateCcw
 } from 'lucide-react';
 import { Appointment } from '../../types';
 import { api } from '../../api/client';
@@ -53,12 +55,24 @@ export const SendReminderModal: React.FC<SendReminderModalProps> = ({
   const [hasCopiedWa, setHasCopiedWa] = useState(false);
   const [isRefreshingQr, setIsRefreshingQr] = useState(false);
 
+  // Editable recipient phone number
+  const [recipientPhone, setRecipientPhone] = useState<string>('+917027635901');
+
   // Local WhatsApp Gateway state
   const [gatewayStatus, setGatewayStatus] = useState<WhatsAppGatewayStatus>({
     status: 'LOADING',
     phone: null,
     qr_image: null,
   });
+
+  // Sync recipient phone from appointment when opened
+  useEffect(() => {
+    if (appointment?.patient?.phone && appointment.patient.phone.trim() !== '') {
+      setRecipientPhone(appointment.patient.phone.trim());
+    } else {
+      setRecipientPhone('+917027635901');
+    }
+  }, [appointment, isOpen]);
 
   // Poll WhatsApp Gateway status when WhatsApp tab is active
   useEffect(() => {
@@ -102,9 +116,8 @@ export const SendReminderModal: React.FC<SendReminderModalProps> = ({
       Math.max(0.12, (appointment.prediction?.risk_probability || 0.70) * 0.45)) * 100
   );
 
-  // Clean phone number for WhatsApp wa.me link
-  const rawPhone = patient?.phone || '+917027635901';
-  const cleanPhone = rawPhone.replace(/[^0-9]/g, '');
+  // Clean phone number for WhatsApp link / gateway dispatch
+  const cleanPhone = recipientPhone.replace(/[^0-9]/g, '');
 
   // Formatted clinical WhatsApp confirmation text
   const whatsappMessage = 
@@ -136,8 +149,12 @@ _SlotSure Smart Healthcare Engine_`;
   };
 
   const handleManualWhatsAppOpen = () => {
+    if (!cleanPhone) {
+      showToast('Please enter a valid recipient phone number', 'error');
+      return;
+    }
     window.open(whatsappManualUrl, '_blank');
-    showToast(`✓ Opened WhatsApp for ${rawPhone}`, 'info');
+    showToast(`✓ Opened WhatsApp for ${recipientPhone}`, 'info');
   };
 
   const handleRefreshQr = async () => {
@@ -152,7 +169,18 @@ _SlotSure Smart Healthcare Engine_`;
     }
   };
 
+  const handleResetPhone = () => {
+    const orig = patient?.phone || '+917027635901';
+    setRecipientPhone(orig);
+    showToast(`Phone number reset to ${orig}`, 'info');
+  };
+
   const handleSend = async () => {
+    if (!recipientPhone.trim()) {
+      showToast('Please enter a recipient phone number', 'error');
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       // 1. WhatsApp Channel Handling
@@ -176,11 +204,12 @@ _SlotSure Smart Healthcare Engine_`;
                 patient_id: appointment.patient_id,
                 channel: 'WhatsApp',
                 scheduled_for: scheduledFor,
-                notes: `Dispatched automatically via linked WhatsApp (${gatewayStatus.phone})`,
+                phone: recipientPhone,
+                notes: `Dispatched automatically via linked WhatsApp (${gatewayStatus.phone}) to ${recipientPhone}`,
               });
 
               showToast(
-                `✓ Automated WhatsApp sent from ${gatewayStatus.phone} to ${rawPhone}!`,
+                `✓ Automated WhatsApp sent to ${recipientPhone}!`,
                 'success'
               );
               onReminderSent();
@@ -198,11 +227,12 @@ _SlotSure Smart Healthcare Engine_`;
           patient_id: appointment.patient_id,
           channel: 'WhatsApp',
           scheduled_for: scheduledFor,
-          notes: `WhatsApp reminder prepared for ${patient?.first_name} ${patient?.last_name}`,
+          phone: recipientPhone,
+          notes: `WhatsApp reminder prepared for ${patient?.first_name} (${recipientPhone})`,
         });
 
         window.open(whatsappManualUrl, '_blank');
-        showToast(`✓ Reminder logged and WhatsApp opened for ${rawPhone}`, 'success');
+        showToast(`✓ Reminder logged and WhatsApp opened for ${recipientPhone}`, 'success');
         onReminderSent();
         onClose();
         return;
@@ -211,10 +241,17 @@ _SlotSure Smart Healthcare Engine_`;
       // 2. Phone Call Channel Handling
       if (channel === 'Phone Call') {
         if (onTriggerCall) {
-          showToast(`✓ Launching AI Phone Call for ${patient?.first_name}`, 'success');
+          showToast(`✓ Launching AI Phone Call for ${recipientPhone}`, 'success');
           onReminderSent();
           onClose();
-          onTriggerCall(appointment);
+          // Pass the appointment with the customized phone number
+          const updatedAppointment: Appointment = {
+            ...appointment,
+            patient: appointment.patient
+              ? { ...appointment.patient, phone: recipientPhone }
+              : appointment.patient,
+          };
+          onTriggerCall(updatedAppointment);
           return;
         }
       }
@@ -225,10 +262,11 @@ _SlotSure Smart Healthcare Engine_`;
         patient_id: appointment.patient_id,
         channel,
         scheduled_for: scheduledFor,
-        notes: `Carrier SMS dispatched to ${patient?.first_name} ${patient?.last_name}`,
+        phone: recipientPhone,
+        notes: `Carrier SMS dispatched to ${recipientPhone}`,
       });
 
-      showToast(`✓ SMS reminder dispatched to ${rawPhone}`, 'success');
+      showToast(`✓ SMS reminder dispatched to ${recipientPhone}`, 'success');
       onReminderSent();
       onClose();
     } catch (err: any) {
@@ -237,6 +275,8 @@ _SlotSure Smart Healthcare Engine_`;
       setIsSubmitting(false);
     }
   };
+
+  const isPhoneEdited = patient?.phone && recipientPhone.trim() !== patient.phone.trim();
 
   return (
     <AnimatePresence>
@@ -296,6 +336,45 @@ _SlotSure Smart Healthcare Engine_`;
               </div>
               <p className="text-[11px] text-[#6B6B6F] leading-relaxed">
                 Direct patient notification to secure confirmation and minimize clinic no-show loss.
+              </p>
+            </div>
+
+            {/* ================= EDITABLE PHONE NUMBER ================= */}
+            <div className="p-3.5 bg-blue-50/40 dark:bg-blue-500/[0.04] border border-blue-200/70 dark:border-blue-500/20 rounded-2xl space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-[#1D1D1F] dark:text-white flex items-center gap-1.5">
+                  <Smartphone className="h-3.5 w-3.5 text-blue-600" />
+                  <span>Recipient Phone Number</span>
+                </label>
+                {isPhoneEdited && (
+                  <button
+                    type="button"
+                    onClick={handleResetPhone}
+                    className="text-[11px] text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1 cursor-pointer"
+                  >
+                    <RotateCcw className="h-3 w-3" />
+                    <span>Reset to default</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="relative flex items-center">
+                <input
+                  type="tel"
+                  value={recipientPhone}
+                  onChange={(e) => setRecipientPhone(e.target.value)}
+                  placeholder="+91..."
+                  className="w-full text-xs font-mono font-medium px-3.5 py-2.5 bg-white dark:bg-zinc-800 border border-blue-300/80 dark:border-blue-500/30 rounded-xl text-[#1D1D1F] dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-2xs pr-20"
+                />
+                <div className="absolute right-2.5 flex items-center gap-1">
+                  <span className="text-[10px] bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-md font-semibold flex items-center gap-1">
+                    <Edit3 className="h-2.5 w-2.5" />
+                    <span>Editable</span>
+                  </span>
+                </div>
+              </div>
+              <p className="text-[10px] text-[#6B6B6F] dark:text-zinc-400">
+                You can change this number for WhatsApp, SMS, or Phone Call testing without changing patient records.
               </p>
             </div>
 
@@ -476,7 +555,7 @@ _SlotSure Smart Healthcare Engine_`;
                   </div>
 
                   <div className="flex items-center justify-between text-[11px] text-emerald-800 pt-1">
-                    <span>Recipient: <strong>{rawPhone}</strong></span>
+                    <span>Sending to: <strong className="font-mono">{recipientPhone}</strong></span>
                     <span className="text-[10px] bg-emerald-100/60 text-emerald-800 px-2 py-0.5 rounded-full font-semibold">
                       {gatewayStatus.status === 'CONNECTED' ? 'Background Auto-Send' : 'Direct Link'}
                     </span>
@@ -508,7 +587,7 @@ _SlotSure Smart Healthcare Engine_`;
                   </div>
 
                   <div className="text-[11px] text-[#6B6B6F]">
-                    Sent to: <strong className="text-[#1D1D1F]">{rawPhone}</strong> via Twilio SMS Gateway.
+                    Sending to: <strong className="text-[#1D1D1F] font-mono">{recipientPhone}</strong> via Twilio SMS Gateway.
                   </div>
                 </div>
               </motion.div>
@@ -533,7 +612,7 @@ _SlotSure Smart Healthcare Engine_`;
                   </div>
 
                   <p className="text-xs text-indigo-950 leading-relaxed">
-                    Dials <strong>{rawPhone}</strong> to speak clinical details, warn about past missed visits, and record patient confirmation or cancellation directly.
+                    Dials <strong className="font-mono">{recipientPhone}</strong> to speak clinical details, warn about past missed visits, and record patient confirmation or cancellation directly.
                   </p>
 
                   {onTriggerCall && (
@@ -541,12 +620,18 @@ _SlotSure Smart Healthcare Engine_`;
                       type="button"
                       onClick={() => {
                         onClose();
-                        onTriggerCall(appointment);
+                        const updatedAppointment: Appointment = {
+                          ...appointment,
+                          patient: appointment.patient
+                            ? { ...appointment.patient, phone: recipientPhone }
+                            : appointment.patient,
+                        };
+                        onTriggerCall(updatedAppointment);
                       }}
                       className="w-full py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition-all shadow-2xs flex items-center justify-center gap-2 cursor-pointer"
                     >
                       <Sparkles className="h-3.5 w-3.5" />
-                      <span>Open Live AI Call Console ({rawPhone})</span>
+                      <span>Open Live AI Call Console ({recipientPhone})</span>
                     </button>
                   )}
                 </div>
@@ -573,9 +658,9 @@ _SlotSure Smart Healthcare Engine_`;
 
           {/* ===================== FOOTER ===================== */}
           <div className="p-4 border-t border-black/[0.06] dark:border-white/[0.08] flex items-center justify-between bg-[#FAFAFA] dark:bg-white/[0.02]">
-            <div className="text-xs text-[#6B6B6F] flex items-center gap-1.5">
+            <div className="text-xs text-[#6B6B6F] flex items-center gap-1.5 font-mono">
               <Smartphone className="h-3.5 w-3.5 text-[#86868B]" />
-              <span>{rawPhone}</span>
+              <span className="font-semibold text-[#1D1D1F] dark:text-white">{recipientPhone}</span>
             </div>
 
             <div className="flex items-center gap-2">

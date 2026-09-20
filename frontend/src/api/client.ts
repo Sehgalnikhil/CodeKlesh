@@ -140,6 +140,7 @@ export const api = {
     strategy?: string;
     scheduled_for?: string;
     notes?: string;
+    phone?: string;
   }): Promise<Reminder> {
     return request('/reminders', {
       method: 'POST',
