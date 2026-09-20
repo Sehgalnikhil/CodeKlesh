@@ -13,11 +13,7 @@ import {
   Loader2,
   Sparkles,
   Smartphone,
-  QrCode,
-  RefreshCw,
   Zap,
-  Info,
-  Edit3,
   RotateCcw
 } from 'lucide-react';
 import { Appointment } from '../../types';
@@ -32,15 +28,6 @@ interface SendReminderModalProps {
   onTriggerCall?: (appointment: Appointment) => void;
 }
 
-interface WhatsAppGatewayStatus {
-  status: 'CONNECTED' | 'SCAN_QR' | 'DISCONNECTED' | 'INITIALIZING' | 'LOADING';
-  phone: string | null;
-  qr_image: string | null;
-  has_qr?: boolean;
-  qr_age_seconds?: number;
-  is_expired?: boolean;
-}
-
 export const SendReminderModal: React.FC<SendReminderModalProps> = ({
   appointment,
   isOpen,
@@ -49,21 +36,13 @@ export const SendReminderModal: React.FC<SendReminderModalProps> = ({
   onTriggerCall,
 }) => {
   const { showToast } = useAuth();
-  const [channel, setChannel] = useState<'SMS' | 'WhatsApp' | 'Phone Call'>('WhatsApp');
+  const [channel, setChannel] = useState<'WhatsApp' | 'SMS' | 'Phone Call'>('WhatsApp');
   const [scheduledFor, setScheduledFor] = useState('Immediate dispatch');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [hasCopiedWa, setHasCopiedWa] = useState(false);
-  const [isRefreshingQr, setIsRefreshingQr] = useState(false);
+  const [hasCopied, setHasCopied] = useState(false);
 
   // Editable recipient phone number
   const [recipientPhone, setRecipientPhone] = useState<string>('+917027635901');
-
-  // Local WhatsApp Gateway state
-  const [gatewayStatus, setGatewayStatus] = useState<WhatsAppGatewayStatus>({
-    status: 'LOADING',
-    phone: null,
-    qr_image: null,
-  });
 
   // Sync recipient phone from appointment when opened
   useEffect(() => {
@@ -74,39 +53,6 @@ export const SendReminderModal: React.FC<SendReminderModalProps> = ({
     }
   }, [appointment, isOpen]);
 
-  // Poll WhatsApp Gateway status when WhatsApp tab is active
-  useEffect(() => {
-    if (!isOpen || channel !== 'WhatsApp') return;
-
-    let isMounted = true;
-
-    const checkStatus = async () => {
-      try {
-        const res = await fetch('http://127.0.0.1:5005/status', { method: 'GET' });
-        if (res.ok) {
-          const data: WhatsAppGatewayStatus = await res.json();
-          if (isMounted) setGatewayStatus(data);
-        } else {
-          if (isMounted) {
-            setGatewayStatus({ status: 'DISCONNECTED', phone: null, qr_image: null });
-          }
-        }
-      } catch {
-        if (isMounted) {
-          setGatewayStatus({ status: 'DISCONNECTED', phone: null, qr_image: null });
-        }
-      }
-    };
-
-    checkStatus();
-    const interval = setInterval(checkStatus, 3000);
-
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, [isOpen, channel]);
-
   if (!isOpen || !appointment) return null;
 
   const patient = appointment.patient;
@@ -116,57 +62,32 @@ export const SendReminderModal: React.FC<SendReminderModalProps> = ({
       Math.max(0.12, (appointment.prediction?.risk_probability || 0.70) * 0.45)) * 100
   );
 
-  // Clean phone number for WhatsApp link / gateway dispatch
   const cleanPhone = recipientPhone.replace(/[^0-9]/g, '');
 
-  // Formatted clinical WhatsApp confirmation text
-  const whatsappMessage = 
+  // WhatsApp message text
+  const whatsappMessage =
 `🏥 *SlotSure Clinic Appointment Confirmation*
 
-Hello *${patient?.first_name || 'Patient'} ${patient?.last_name || ''}*, this is a clinical reminder for your upcoming appointment:
+Hello *${patient?.first_name || 'Patient'} ${patient?.last_name || ''}*, you have an upcoming consultation:
 
 👨‍⚕️ *Doctor:* ${appointment.doctor_name} (${appointment.department})
 📅 *Date:* ${appointment.appointment_date}
 ⏰ *Time:* ${appointment.appointment_time}
 📍 *Location:* SlotSure Central Clinic
 
-Please reply to this message:
-1️⃣ Reply *1* to *CONFIRM* your appointment
-2️⃣ Reply *2* to *RESCHEDULE* or *CANCEL*
-
-_SlotSure Smart Healthcare Engine_`;
+Reply *1* to *CONFIRM* or *2* to *RESCHEDULE*.
+_SlotSure Healthcare Engine_`;
 
   const whatsappManualUrl = `https://wa.me/${cleanPhone}?text=${encodeURIComponent(whatsappMessage)}`;
 
-  // Formatted SMS text
+  // Carrier SMS text
   const smsMessage = `SlotSure Clinic: Hello ${patient?.first_name}, you have an appointment with ${appointment.doctor_name} on ${appointment.appointment_date} at ${appointment.appointment_time}. Reply 1 to Confirm or 2 to Cancel.`;
 
-  const copyWhatsAppText = () => {
-    navigator.clipboard.writeText(whatsappMessage);
-    setHasCopiedWa(true);
-    showToast('✓ WhatsApp confirmation message copied', 'info');
-    setTimeout(() => setHasCopiedWa(false), 2000);
-  };
-
-  const handleManualWhatsAppOpen = () => {
-    if (!cleanPhone) {
-      showToast('Please enter a valid recipient phone number', 'error');
-      return;
-    }
-    window.open(whatsappManualUrl, '_blank');
-    showToast(`✓ Opened WhatsApp for ${recipientPhone}`, 'info');
-  };
-
-  const handleRefreshQr = async () => {
-    setIsRefreshingQr(true);
-    try {
-      await fetch('http://127.0.0.1:5005/refresh-qr', { method: 'POST' });
-      showToast('Generating fresh WhatsApp QR code...', 'info');
-    } catch {
-      showToast('Gateway not responding. Make sure service is running.', 'error');
-    } finally {
-      setTimeout(() => setIsRefreshingQr(false), 1500);
-    }
+  const copyText = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setHasCopied(true);
+    showToast('✓ Message copied to clipboard', 'info');
+    setTimeout(() => setHasCopied(false), 2000);
   };
 
   const handleResetPhone = () => {
@@ -183,7 +104,7 @@ _SlotSure Smart Healthcare Engine_`;
 
     setIsSubmitting(true);
     try {
-      // 1. WhatsApp Channel Handling
+      // 1. WhatsApp Channel
       if (channel === 'WhatsApp') {
         const reminderRes = await api.dispatchReminder({
           appointment_id: appointment.id,
@@ -195,9 +116,9 @@ _SlotSure Smart Healthcare Engine_`;
         });
 
         if (reminderRes?.notes?.includes('Twilio WhatsApp')) {
-          showToast(`✓ Twilio WhatsApp Template sent directly to ${recipientPhone}!`, 'success');
+          showToast(`✓ WhatsApp confirmation sent to ${recipientPhone}!`, 'success');
         } else if (reminderRes?.notes?.includes('Local WhatsApp')) {
-          showToast(`✓ Automated WhatsApp sent via local gateway to ${recipientPhone}!`, 'success');
+          showToast(`✓ WhatsApp sent via local gateway to ${recipientPhone}!`, 'success');
         } else {
           window.open(whatsappManualUrl, '_blank');
           showToast(`✓ WhatsApp reminder logged and opened for ${recipientPhone}`, 'success');
@@ -208,14 +129,12 @@ _SlotSure Smart Healthcare Engine_`;
         return;
       }
 
-
-      // 2. Phone Call Channel Handling
+      // 2. Phone Call Channel
       if (channel === 'Phone Call') {
         if (onTriggerCall) {
           showToast(`✓ Launching AI Phone Call for ${recipientPhone}`, 'success');
           onReminderSent();
           onClose();
-          // Pass the appointment with the customized phone number
           const updatedAppointment: Appointment = {
             ...appointment,
             patient: appointment.patient
@@ -227,11 +146,11 @@ _SlotSure Smart Healthcare Engine_`;
         }
       }
 
-      // 3. SMS Channel Handling
+      // 3. Carrier SMS Channel
       await api.dispatchReminder({
         appointment_id: appointment.id,
         patient_id: appointment.patient_id,
-        channel,
+        channel: 'SMS',
         scheduled_for: scheduledFor,
         phone: recipientPhone,
         notes: `Carrier SMS dispatched to ${recipientPhone}`,
@@ -253,15 +172,15 @@ _SlotSure Smart Healthcare Engine_`;
     <AnimatePresence>
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-md">
         <motion.div
-          initial={{ opacity: 0, scale: 0.95, y: 12 }}
+          initial={{ opacity: 0, scale: 0.96, y: 8 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
-          exit={{ opacity: 0, scale: 0.95, y: 12 }}
+          exit={{ opacity: 0, scale: 0.96, y: 8 }}
           transition={{ type: 'spring', damping: 28, stiffness: 340 }}
           className="bg-white dark:bg-[#181818] border border-black/[0.08] dark:border-white/[0.1] rounded-3xl shadow-[0_24px_64px_rgba(0,0,0,0.14)] max-w-lg w-full overflow-hidden flex flex-col"
         >
           {/* ===================== HEADER ===================== */}
-          <div className="p-5 border-b border-black/[0.06] dark:border-white/[0.08] flex items-center justify-between bg-[#FAFAFA] dark:bg-white/[0.02]">
-            <div className="flex items-center gap-2.5">
+          <div className="px-5 py-4 border-b border-black/[0.06] dark:border-white/[0.08] flex items-center justify-between bg-[#FAFAFA] dark:bg-white/[0.02]">
+            <div className="flex items-center gap-3">
               <div className="h-9 w-9 rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-500/10 dark:text-blue-400 flex items-center justify-center shadow-2xs">
                 <Send className="h-4 w-4" />
               </div>
@@ -270,7 +189,7 @@ _SlotSure Smart Healthcare Engine_`;
                   Send Clinical Reminder
                 </h3>
                 <p className="text-xs text-[#6B6B6F]">
-                  {patient?.first_name} {patient?.last_name} · {appointment.appointment_time}
+                  {patient?.first_name} {patient?.last_name} · {appointment.appointment_time} · {appointment.doctor_name}
                 </p>
               </div>
             </div>
@@ -282,40 +201,26 @@ _SlotSure Smart Healthcare Engine_`;
             </button>
           </div>
 
-          <div className="p-5 space-y-4 overflow-y-auto max-h-[80vh]">
-            {/* Impact Projection Card */}
-            <div className="p-3.5 bg-[#F8F9FA] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.06] rounded-2xl space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-medium text-[#6B6B6F]">
-                  Projected Risk Reduction
-                </span>
-                <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/80 px-2 py-0.5 rounded-full">
-                  ML Projection
-                </span>
-              </div>
-              <div className="flex items-center gap-3">
-                <span className="text-lg font-bold text-rose-600">
-                  {currentProb}%
-                </span>
-                <ArrowRight className="h-4 w-4 text-[#86868B]" />
-                <span className="text-lg font-bold text-emerald-600">
-                  {impactProb}%
-                </span>
-                <span className="text-xs font-semibold text-emerald-700 bg-emerald-100/60 px-2 py-0.5 rounded-md">
+          <div className="p-5 space-y-3.5">
+            {/* ================= RISK IMPACT STRIP ================= */}
+            <div className="flex items-center justify-between px-3.5 py-2.5 bg-[#F8F9FA] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.06] rounded-xl text-xs">
+              <span className="text-[#6B6B6F] font-medium">Risk Reduction</span>
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-rose-600">{currentProb}%</span>
+                <ArrowRight className="h-3.5 w-3.5 text-[#86868B]" />
+                <span className="font-bold text-emerald-600">{impactProb}%</span>
+                <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-100/70 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded-md">
                   -{Math.max(1, currentProb - impactProb)}% Risk
                 </span>
               </div>
-              <p className="text-[11px] text-[#6B6B6F] leading-relaxed">
-                Direct patient notification to secure confirmation and minimize clinic no-show loss.
-              </p>
             </div>
 
-            {/* ================= EDITABLE PHONE NUMBER ================= */}
-            <div className="p-3.5 bg-blue-50/40 dark:bg-blue-500/[0.04] border border-blue-200/70 dark:border-blue-500/20 rounded-2xl space-y-2">
-              <div className="flex items-center justify-between">
+            {/* ================= EDITABLE PHONE INPUT ================= */}
+            <div>
+              <div className="flex items-center justify-between mb-1">
                 <label className="text-xs font-semibold text-[#1D1D1F] dark:text-white flex items-center gap-1.5">
                   <Smartphone className="h-3.5 w-3.5 text-blue-600" />
-                  <span>Recipient Phone Number</span>
+                  <span>Recipient Phone</span>
                 </label>
                 {isPhoneEdited && (
                   <button
@@ -324,159 +229,125 @@ _SlotSure Smart Healthcare Engine_`;
                     className="text-[11px] text-blue-600 hover:text-blue-800 font-medium flex items-center gap-1 cursor-pointer"
                   >
                     <RotateCcw className="h-3 w-3" />
-                    <span>Reset to default</span>
+                    <span>Reset</span>
                   </button>
                 )}
               </div>
-
-              <div className="relative flex items-center">
-                <input
-                  type="tel"
-                  value={recipientPhone}
-                  onChange={(e) => setRecipientPhone(e.target.value)}
-                  placeholder="+91..."
-                  className="w-full text-xs font-mono font-medium px-3.5 py-2.5 bg-white dark:bg-zinc-800 border border-blue-300/80 dark:border-blue-500/30 rounded-xl text-[#1D1D1F] dark:text-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 shadow-2xs pr-20"
-                />
-                <div className="absolute right-2.5 flex items-center gap-1">
-                  <span className="text-[10px] bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded-md font-semibold flex items-center gap-1">
-                    <Edit3 className="h-2.5 w-2.5" />
-                    <span>Editable</span>
-                  </span>
-                </div>
-              </div>
-              <p className="text-[10px] text-[#6B6B6F] dark:text-zinc-400">
-                You can change this number for WhatsApp, SMS, or Phone Call testing without changing patient records.
-              </p>
+              <input
+                type="tel"
+                value={recipientPhone}
+                onChange={(e) => setRecipientPhone(e.target.value)}
+                placeholder="+91..."
+                className="w-full text-xs font-mono px-3 py-2 bg-white dark:bg-zinc-800 border border-black/[0.12] dark:border-white/[0.1] rounded-xl text-[#1D1D1F] dark:text-white focus:outline-hidden focus:border-blue-500 shadow-2xs"
+              />
             </div>
 
-            {/* Channel Selection Buttons */}
+            {/* ================= CHANNEL SELECTOR ================= */}
             <div>
-              <label className="block text-xs font-semibold text-[#1D1D1F] dark:text-white mb-2">
-                Communication Channel
+              <label className="block text-xs font-semibold text-[#1D1D1F] dark:text-white mb-1.5">
+                Channel
               </label>
               <div className="grid grid-cols-3 gap-2">
                 {/* 1. WhatsApp */}
                 <button
                   type="button"
                   onClick={() => setChannel('WhatsApp')}
-                  className={`py-2.5 px-3 rounded-2xl border text-xs font-semibold flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
+                  className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                     channel === 'WhatsApp'
-                      ? 'border-emerald-600 bg-emerald-50 text-emerald-800 shadow-2xs'
-                      : 'border-black/[0.08] hover:bg-black/[0.02] text-[#6B6B6F] hover:text-[#1D1D1F]'
+                      ? 'border-emerald-600 bg-emerald-50 text-emerald-800 shadow-2xs dark:bg-emerald-950/30 dark:text-emerald-400'
+                      : 'border-black/[0.08] hover:bg-black/[0.02] text-[#6B6B6F] hover:text-[#1D1D1F] dark:border-white/[0.08]'
                   }`}
                 >
-                  <div className="flex items-center gap-1">
-                    <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                    <span>WhatsApp</span>
-                  </div>
-                  <span className="text-[10px] text-emerald-700 font-medium">100% Free</span>
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
+                  <span>WhatsApp</span>
                 </button>
 
                 {/* 2. SMS */}
                 <button
                   type="button"
                   onClick={() => setChannel('SMS')}
-                  className={`py-2.5 px-3 rounded-2xl border text-xs font-semibold flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
+                  className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                     channel === 'SMS'
-                      ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-2xs'
-                      : 'border-black/[0.08] hover:bg-black/[0.02] text-[#6B6B6F] hover:text-[#1D1D1F]'
+                      ? 'border-blue-600 bg-blue-50 text-blue-700 shadow-2xs dark:bg-blue-950/30 dark:text-blue-400'
+                      : 'border-black/[0.08] hover:bg-black/[0.02] text-[#6B6B6F] hover:text-[#1D1D1F] dark:border-white/[0.08]'
                   }`}
                 >
-                  <MessageSquare className="h-4 w-4" />
-                  <span>SMS</span>
-                  <span className="text-[10px] text-[#86868B]">Twilio Carrier</span>
+                  <MessageSquare className="h-3.5 w-3.5 text-blue-600" />
+                  <span>Carrier SMS</span>
                 </button>
 
                 {/* 3. Phone Call */}
                 <button
                   type="button"
                   onClick={() => setChannel('Phone Call')}
-                  className={`py-2.5 px-3 rounded-2xl border text-xs font-semibold flex flex-col items-center gap-1.5 transition-all cursor-pointer ${
+                  className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
                     channel === 'Phone Call'
-                      ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-2xs'
-                      : 'border-black/[0.08] hover:bg-black/[0.02] text-[#6B6B6F] hover:text-[#1D1D1F]'
+                      ? 'border-indigo-600 bg-indigo-50 text-indigo-700 shadow-2xs dark:bg-indigo-950/30 dark:text-indigo-400'
+                      : 'border-black/[0.08] hover:bg-black/[0.02] text-[#6B6B6F] hover:text-[#1D1D1F] dark:border-white/[0.08]'
                   }`}
                 >
-                  <PhoneCall className="h-4 w-4" />
-                  <span>Phone Call</span>
-                  <span className="text-[10px] text-indigo-600 font-medium">Interactive AI</span>
+                  <PhoneCall className="h-3.5 w-3.5 text-indigo-600" />
+                  <span>AI Call</span>
                 </button>
               </div>
             </div>
 
-            {/* ================= CHANNEL CONTENT PREVIEWS ================= */}
+            {/* ================= CHANNEL CONTENT ================= */}
 
-            {/* WHATSAPP CONTENT */}
+            {/* WHATSAPP */}
             {channel === 'WhatsApp' && (
               <motion.div
-                initial={{ opacity: 0, y: 4 }}
+                initial={{ opacity: 0, y: 2 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="space-y-3"
+                className="space-y-2.5"
               >
-                {/* Twilio WhatsApp Business Cloud Gateway (Active) */}
-                <div className="p-3.5 bg-emerald-50/80 border border-emerald-300/90 rounded-2xl space-y-2 shadow-2xs">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <div className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
-                      <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
-                        <span>WhatsApp Cloud Gateway Active</span>
-                        <span className="text-[10px] text-emerald-700 font-mono bg-emerald-100 px-1.5 py-0.2 rounded font-normal">
-                          +1 (737) 250-8034
-                        </span>
-                      </span>
-                    </div>
-                    <span className="text-[10px] font-bold text-emerald-800 bg-emerald-200/60 px-2 py-0.5 rounded-full flex items-center gap-1">
-                      <Zap className="h-3 w-3" /> Auto
-                    </span>
+                {/* Gateway Pill */}
+                <div className="flex items-center justify-between px-3 py-1.5 bg-emerald-50/80 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/40 rounded-xl text-[11px]">
+                  <div className="flex items-center gap-1.5 text-emerald-900 dark:text-emerald-300 font-medium">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Twilio Cloud WhatsApp Active</span>
+                    <span className="text-emerald-700 font-mono text-[10px]">(+1 737 250-8034)</span>
                   </div>
-                  <p className="text-[11px] text-emerald-800 leading-relaxed">
-                    Automated background delivery via official Meta Template (<code className="text-[10px] font-mono">HXfe5ab5...</code>). No QR scan or open browser tabs needed!
-                  </p>
+                  <span className="text-[10px] text-emerald-800 font-semibold bg-emerald-200/60 dark:bg-emerald-900/50 px-1.5 py-0.2 rounded-md">
+                    Meta Template
+                  </span>
                 </div>
 
-
-                {/* Message Preview Box */}
-                <div className="p-3.5 bg-emerald-50/40 border border-emerald-200 rounded-2xl space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
-                      <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+                {/* Preview Box */}
+                <div className="p-3 bg-emerald-50/30 dark:bg-white/[0.02] border border-emerald-200/70 dark:border-white/[0.08] rounded-xl space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-emerald-900 dark:text-emerald-300 flex items-center gap-1">
+                      <CheckCircle2 className="h-3.5 w-3.5 text-emerald-600" />
                       <span>Message Preview</span>
                     </span>
                     <button
                       type="button"
-                      onClick={copyWhatsAppText}
+                      onClick={() => copyText(whatsappMessage)}
                       className="text-[11px] text-emerald-700 hover:text-emerald-900 font-medium flex items-center gap-1 cursor-pointer"
                     >
-                      {hasCopiedWa ? <CheckCheck className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
-                      <span>{hasCopiedWa ? 'Copied' : 'Copy'}</span>
+                      {hasCopied ? <CheckCheck className="h-3.5 w-3.5 text-emerald-600" /> : <Copy className="h-3.5 w-3.5" />}
+                      <span>{hasCopied ? 'Copied' : 'Copy'}</span>
                     </button>
                   </div>
 
-                  <div className="p-3 bg-white border border-emerald-200/60 rounded-xl text-xs text-[#1D1D1F] font-mono whitespace-pre-wrap leading-relaxed shadow-2xs max-h-40 overflow-y-auto">
+                  <div className="p-2.5 bg-white dark:bg-zinc-900 border border-emerald-200/60 dark:border-white/[0.08] rounded-lg text-xs text-[#1D1D1F] dark:text-zinc-200 font-mono whitespace-pre-wrap leading-relaxed max-h-36 overflow-y-auto">
                     {whatsappMessage}
-                  </div>
-
-                  <div className="flex items-center justify-between text-[11px] text-emerald-800 pt-1">
-                    <span>Sending to: <strong className="font-mono">{recipientPhone}</strong></span>
-                    <span className="text-[10px] bg-emerald-100/60 text-emerald-800 px-2 py-0.5 rounded-full font-semibold">
-                      {gatewayStatus.status === 'CONNECTED' ? 'Background Auto-Send' : 'Direct Link'}
-                    </span>
                   </div>
                 </div>
               </motion.div>
             )}
 
-            {/* SMS CONTENT */}
+            {/* SMS */}
             {channel === 'SMS' && (
               <motion.div
-                initial={{ opacity: 0, y: 4 }}
+                initial={{ opacity: 0, y: 2 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="space-y-3"
+                className="space-y-2.5"
               >
-                <div className="p-3.5 bg-blue-50/70 border border-blue-200 rounded-2xl space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-blue-900 flex items-center gap-1.5">
-                      <MessageSquare className="h-4 w-4 text-blue-600" />
+                <div className="p-3 bg-blue-50/40 dark:bg-white/[0.02] border border-blue-200/70 dark:border-white/[0.08] rounded-xl space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-blue-900 dark:text-blue-300 flex items-center gap-1">
+                      <MessageSquare className="h-3.5 w-3.5 text-blue-600" />
                       <span>Carrier SMS Preview</span>
                     </span>
                     <span className="text-[11px] text-[#6B6B6F] font-mono">
@@ -484,37 +355,33 @@ _SlotSure Smart Healthcare Engine_`;
                     </span>
                   </div>
 
-                  <div className="p-3 bg-white border border-blue-200/60 rounded-xl text-xs text-[#1D1D1F] font-mono leading-relaxed shadow-2xs">
+                  <div className="p-2.5 bg-white dark:bg-zinc-900 border border-blue-200/60 dark:border-white/[0.08] rounded-lg text-xs text-[#1D1D1F] dark:text-zinc-200 font-mono leading-relaxed">
                     {smsMessage}
-                  </div>
-
-                  <div className="text-[11px] text-[#6B6B6F]">
-                    Sending to: <strong className="text-[#1D1D1F] font-mono">{recipientPhone}</strong> via Twilio SMS Gateway.
                   </div>
                 </div>
               </motion.div>
             )}
 
-            {/* PHONE CALL CONTENT */}
+            {/* PHONE CALL */}
             {channel === 'Phone Call' && (
               <motion.div
-                initial={{ opacity: 0, y: 4 }}
+                initial={{ opacity: 0, y: 2 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="space-y-3"
+                className="space-y-2.5"
               >
-                <div className="p-3.5 bg-indigo-50/70 border border-indigo-200 rounded-2xl space-y-2.5">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-indigo-900 flex items-center gap-1.5">
-                      <PhoneCall className="h-4 w-4 text-indigo-600" />
-                      <span>SlotSure Conversational AI Call</span>
+                <div className="p-3.5 bg-indigo-50/50 dark:bg-white/[0.02] border border-indigo-200/70 dark:border-white/[0.08] rounded-xl space-y-2">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-semibold text-indigo-900 dark:text-indigo-300 flex items-center gap-1.5">
+                      <PhoneCall className="h-3.5 w-3.5 text-indigo-600" />
+                      <span>Conversational Voice Call</span>
                     </span>
-                    <span className="text-[10px] bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full font-semibold">
-                      Speech + DTMF Sync
+                    <span className="text-[10px] bg-indigo-100 dark:bg-indigo-950/60 text-indigo-800 dark:text-indigo-300 px-1.5 py-0.2 rounded font-semibold">
+                      Speech + Touchtone
                     </span>
                   </div>
 
-                  <p className="text-xs text-indigo-950 leading-relaxed">
-                    Dials <strong className="font-mono">{recipientPhone}</strong> to speak clinical details, warn about past missed visits, and record patient confirmation or cancellation directly.
+                  <p className="text-xs text-indigo-950 dark:text-zinc-300 leading-relaxed">
+                    Dials <strong className="font-mono">{recipientPhone}</strong> to deliver appointment details and record attendance directly.
                   </p>
 
                   {onTriggerCall && (
@@ -530,7 +397,7 @@ _SlotSure Smart Healthcare Engine_`;
                         };
                         onTriggerCall(updatedAppointment);
                       }}
-                      className="w-full py-2.5 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition-all shadow-2xs flex items-center justify-center gap-2 cursor-pointer"
+                      className="w-full py-2 px-3 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-semibold text-xs transition-all shadow-2xs flex items-center justify-center gap-1.5 cursor-pointer"
                     >
                       <Sparkles className="h-3.5 w-3.5" />
                       <span>Open Live AI Call Console ({recipientPhone})</span>
@@ -540,18 +407,18 @@ _SlotSure Smart Healthcare Engine_`;
               </motion.div>
             )}
 
-            {/* Timing Selection */}
+            {/* ================= SCHEDULE ================= */}
             <div>
-              <label className="block text-xs font-semibold text-[#1D1D1F] dark:text-white mb-1.5">
-                Dispatch Schedule
+              <label className="block text-xs font-semibold text-[#1D1D1F] dark:text-white mb-1">
+                Schedule
               </label>
               <select
                 value={scheduledFor}
                 onChange={e => setScheduledFor(e.target.value)}
-                className="w-full text-xs px-3 py-2.5 bg-white dark:bg-zinc-800 border border-black/[0.12] dark:border-white/[0.1] rounded-xl text-[#1D1D1F] dark:text-white focus:outline-hidden focus:border-blue-500 shadow-2xs"
+                className="w-full text-xs px-3 py-2 bg-white dark:bg-zinc-800 border border-black/[0.12] dark:border-white/[0.1] rounded-xl text-[#1D1D1F] dark:text-white focus:outline-hidden focus:border-blue-500 shadow-2xs"
               >
                 <option value="Immediate dispatch">Immediate Dispatch (Send Now)</option>
-                <option value="24 hours before appointment">24 hours before appointment (Recommended)</option>
+                <option value="24 hours before appointment">24 hours before appointment</option>
                 <option value="48 hours before appointment">48 hours before appointment</option>
                 <option value="Morning of appointment (7:00 AM)">Morning of appointment (7:00 AM)</option>
               </select>
@@ -559,7 +426,7 @@ _SlotSure Smart Healthcare Engine_`;
           </div>
 
           {/* ===================== FOOTER ===================== */}
-          <div className="p-4 border-t border-black/[0.06] dark:border-white/[0.08] flex items-center justify-between bg-[#FAFAFA] dark:bg-white/[0.02]">
+          <div className="px-5 py-3.5 border-t border-black/[0.06] dark:border-white/[0.08] flex items-center justify-between bg-[#FAFAFA] dark:bg-white/[0.02]">
             <div className="text-xs text-[#6B6B6F] flex items-center gap-1.5 font-mono">
               <Smartphone className="h-3.5 w-3.5 text-[#86868B]" />
               <span className="font-semibold text-[#1D1D1F] dark:text-white">{recipientPhone}</span>
@@ -569,7 +436,7 @@ _SlotSure Smart Healthcare Engine_`;
               <button
                 onClick={onClose}
                 disabled={isSubmitting}
-                className="px-3.5 py-2 text-xs font-semibold text-[#6B6B6F] hover:text-[#1D1D1F] rounded-xl transition-colors cursor-pointer"
+                className="px-3 py-1.5 text-xs font-semibold text-[#6B6B6F] hover:text-[#1D1D1F] rounded-lg transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -577,7 +444,7 @@ _SlotSure Smart Healthcare Engine_`;
               <button
                 onClick={handleSend}
                 disabled={isSubmitting}
-                className={`px-4 py-2 text-xs font-semibold text-white rounded-xl shadow-sm transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer ${
+                className={`px-4 py-2 text-xs font-semibold text-white rounded-xl shadow-xs transition-all flex items-center gap-1.5 disabled:opacity-50 cursor-pointer ${
                   channel === 'WhatsApp'
                     ? 'bg-emerald-600 hover:bg-emerald-700'
                     : channel === 'Phone Call'
@@ -587,20 +454,12 @@ _SlotSure Smart Healthcare Engine_`;
               >
                 {isSubmitting ? (
                   <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : channel === 'WhatsApp' ? (
-                  gatewayStatus.status === 'CONNECTED' ? (
-                    <Send className="h-3.5 w-3.5" />
-                  ) : (
-                    <ExternalLink className="h-3.5 w-3.5" />
-                  )
                 ) : (
                   <Send className="h-3.5 w-3.5" />
                 )}
                 <span>
                   {channel === 'WhatsApp'
-                    ? gatewayStatus.status === 'CONNECTED'
-                      ? 'Send Automated WhatsApp'
-                      : 'Send via WhatsApp'
+                    ? 'Send on WhatsApp'
                     : channel === 'Phone Call'
                     ? 'Launch AI Call'
                     : 'Send SMS'}
