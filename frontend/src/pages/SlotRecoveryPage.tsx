@@ -2,12 +2,12 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ShieldAlert,
+  ShieldCheck,
   UserCheck,
   CalendarCheck,
   AlertTriangle,
   ArrowRight,
   Clock,
-  Sparkles,
   CheckCircle2,
   Users,
   Filter,
@@ -20,7 +20,12 @@ import {
   UserPlus,
   Loader2,
   Trash2,
-  Stethoscope
+  Stethoscope,
+  Phone,
+  Activity,
+  Layers,
+  ArrowRightLeft,
+  ChevronRight
 } from 'lucide-react';
 import { SlotRecoveryItem, WaitlistEntry, Appointment } from '../types';
 import { api } from '../api/client';
@@ -234,62 +239,72 @@ export const SlotRecoveryPage: React.FC<SlotRecoveryPageProps> = ({ onRefreshDat
 
       {activeTab === 'RECOVERY_QUEUE' ? (
         <>
-          {/* Visual Pipeline Banner */}
-          <div className="p-5 rounded-2xl bg-white/70 dark:bg-[#181818]/70 backdrop-blur-xl border border-white/60 dark:border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.04)]">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B6B6F]">
-                Autonomous Recovery Pipeline
-              </span>
-              <span className="text-[11px] font-medium text-[#4F8A70]">
-                Live Capacity Protection Active
+          {/* Visual Clinical Capacity Progression Stepper */}
+          <div className="p-5 sm:p-6 rounded-3xl bg-white dark:bg-[#181818] border border-slate-200/90 dark:border-white/10 shadow-[0_8px_30px_-6px_rgba(15,23,42,0.04)]">
+            <div className="flex items-center justify-between mb-4 pb-3 border-b border-slate-100 dark:border-white/[0.06]">
+              <div className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-700 dark:text-slate-300">
+                  Autonomous Slot Recovery Pipeline
+                </span>
+              </div>
+              <span className="text-[11px] font-mono font-bold text-emerald-700 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-200 dark:border-emerald-800 px-2.5 py-0.5 rounded-full">
+                ACTIVE CAPACITY ORCHESTRATION
               </span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
-              <div className="p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.04] dark:border-white/[0.06]">
-                <span className="text-[10px] font-bold text-[#C9685B] uppercase block">1. At-Risk Slot</span>
-                <p className="font-semibold text-[#1D1D1F] dark:text-white mt-1 truncate">Unconfirmed &gt;70% Risk</p>
-                <p className="text-[11px] text-[#6B6B6F] mt-0.5">Identified via ML model</p>
+              <div className="p-3.5 rounded-2xl bg-rose-50/60 dark:bg-rose-950/20 border border-rose-200/70 dark:border-rose-900/40">
+                <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wide block">1. At-Risk Triage</span>
+                <p className="font-bold text-slate-900 dark:text-white mt-1">Unconfirmed &gt;70% Risk</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Statistical no-show probability</p>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.04] dark:border-white/[0.06]">
-                <span className="text-[10px] font-bold text-[#C18A3A] uppercase block">2. Recommendation</span>
-                <p className="font-semibold text-[#1D1D1F] dark:text-white mt-1 truncate">Check Waitlist Backfill</p>
-                <p className="text-[11px] text-[#6B6B6F] mt-0.5">Automated triage reason</p>
+              <div className="p-3.5 rounded-2xl bg-amber-50/60 dark:bg-amber-950/20 border border-amber-200/70 dark:border-amber-900/40">
+                <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wide block">2. Clinical Protocol</span>
+                <p className="font-bold text-slate-900 dark:text-white mt-1">Waitlist Tender or Double-Book</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Automated triage recommendation</p>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.04] dark:border-white/[0.06]">
-                <span className="text-[10px] font-bold text-[#647A8A] uppercase block">3. Candidate Match</span>
-                <p className="font-semibold text-[#1D1D1F] dark:text-white mt-1 truncate">Matching Department</p>
-                <p className="text-[11px] text-[#6B6B6F] mt-0.5">Ranked by urgency</p>
+              <div className="p-3.5 rounded-2xl bg-sky-50/60 dark:bg-sky-950/20 border border-sky-200/70 dark:border-sky-900/40">
+                <span className="text-[10px] font-bold text-sky-700 uppercase tracking-wide block">3. Department Match</span>
+                <p className="font-bold text-slate-900 dark:text-white mt-1">Matching Specialty</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Ranked by medical urgency</p>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.04] dark:border-white/[0.06]">
-                <span className="text-[10px] font-bold text-[#4F8A70] uppercase block">4. Recovered Slot</span>
-                <p className="font-semibold text-[#4F8A70] mt-1 truncate">100% Slot Value Intact</p>
-                <p className="text-[11px] text-[#6B6B6F] mt-0.5">Zero clinic idle time</p>
+              <div className="p-3.5 rounded-2xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/70 dark:border-emerald-900/40">
+                <span className="text-[10px] font-bold text-emerald-700 uppercase tracking-wide block">4. Capacity Secured</span>
+                <p className="font-bold text-emerald-900 dark:text-emerald-300 mt-1">100% Slot Value Intact</p>
+                <p className="text-[11px] text-slate-500 mt-0.5">Zero idle clinician overhead</p>
               </div>
             </div>
           </div>
 
           {/* Filter Pills */}
-          <div className="flex items-center gap-1.5 overflow-x-auto p-1 bg-black/[0.03] dark:bg-white/[0.04] rounded-full w-fit">
+          <div className="flex items-center gap-1.5 overflow-x-auto p-1 bg-slate-100 dark:bg-white/[0.04] rounded-full w-fit">
             {[
-              { id: 'ALL', label: 'All Slots' },
-              { id: 'WAITLIST', label: 'Waitlist Backfill' },
-              { id: 'DOUBLE_BOOK', label: 'Controlled Double-Book' },
-              { id: 'EXECUTED', label: 'Recovered' },
+              { id: 'ALL', label: 'All Slots', count: recoveries.length },
+              { id: 'WAITLIST', label: 'Waitlist Backfill', count: recoveries.filter(r => r.action_type === 'WAITLIST' && r.status === 'Proposed').length },
+              { id: 'DOUBLE_BOOK', label: 'Controlled Double-Book', count: recoveries.filter(r => r.action_type === 'DOUBLE_BOOK' && r.status === 'Proposed').length },
+              { id: 'EXECUTED', label: 'Recovered', count: recoveries.filter(r => r.status === 'Executed').length },
             ].map(f => (
               <button
                 key={f.id}
                 onClick={() => setFilterAction(f.id)}
-                className={`px-3.5 py-1 text-xs font-medium rounded-full transition-all whitespace-nowrap ${
+                className={`px-3.5 py-1.5 text-xs font-semibold rounded-full transition-all whitespace-nowrap flex items-center gap-1.5 ${
                   filterAction === f.id
-                    ? 'bg-white dark:bg-[#2C2C2E] text-[#1D1D1F] dark:text-white shadow-sm'
-                    : 'text-[#6B6B6F] hover:text-[#1D1D1F] dark:hover:text-white'
+                    ? 'bg-slate-900 dark:bg-white text-white dark:text-slate-900 shadow-sm'
+                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
                 }`}
               >
-                {f.label}
+                <span>{f.label}</span>
+                <span className={`text-[10px] font-mono px-1.5 py-0.2 rounded-full ${
+                  filterAction === f.id
+                    ? 'bg-slate-700 dark:bg-slate-200 text-white dark:text-slate-900'
+                    : 'bg-slate-200/80 dark:bg-white/10 text-slate-600 dark:text-slate-400'
+                }`}>
+                  {f.count}
+                </span>
               </button>
             ))}
           </div>
@@ -300,24 +315,30 @@ export const SlotRecoveryPage: React.FC<SlotRecoveryPageProps> = ({ onRefreshDat
               const waitingCandidates = waitlist.filter(w => w.status === 'Waiting');
               const currentCandidate = waitingCandidates[tenderCandidateIndex % waitingCandidates.length];
               const focalRecovery = activeAtRiskSlots[0];
+              const focalApp = focalRecovery?.appointment;
+              const doctorText = focalApp?.doctor_name || 'Dr. Sharma';
+              const deptText = focalApp?.department || 'Consultation';
+              const timeText = focalApp?.appointment_time || '10:30 AM';
+              const candName = currentCandidate?.patient ? `${currentCandidate.patient.first_name} ${currentCandidate.patient.last_name}` : 'Priority Standby Candidate';
 
               return (
-                <div className="p-5 rounded-2xl bg-[#4F8A70]/10 border border-[#4F8A70]/20 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs">
-                  <div className="flex items-start gap-3">
-                    <div className="h-10 w-10 rounded-xl bg-[#4F8A70] text-white flex items-center justify-center font-bold flex-shrink-0 mt-0.5">
+                <div className="p-5 sm:p-6 rounded-3xl bg-gradient-to-r from-emerald-50 via-teal-50/40 to-white dark:from-[#4F8A70]/15 dark:to-transparent border border-emerald-300/80 dark:border-[#4F8A70]/40 flex flex-col md:flex-row md:items-center justify-between gap-4 text-xs shadow-xs">
+                  <div className="flex items-start gap-3.5">
+                    <div className="h-11 w-11 rounded-2xl bg-emerald-700 text-white flex items-center justify-center font-bold flex-shrink-0 mt-0.5 shadow-sm">
                       <Clock className="h-5 w-5" />
                     </div>
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className="font-semibold text-sm text-[#1D1D1F] dark:text-white">
-                          Smart Slot Tender: Backfill Active
+                        <span className="font-bold text-sm text-slate-900 dark:text-white">
+                          Smart Slot Tender: Active Backfill Stream
                         </span>
-                        <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#4F8A70] text-white animate-pulse">
+                        <span className="font-mono text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-700 text-white flex items-center gap-1 shadow-2xs">
+                          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
                           {formatTimer(tenderSeconds)} remaining
                         </span>
                       </div>
-                      <p className="text-[#6B6B6F] text-xs mt-1">
-                        Ephemeral offer dispatched to candidate <strong>{currentCandidate?.patient?.first_name} {currentCandidate?.patient?.last_name}</strong> for {focalRecovery?.appointment?.appointment_time} slot ({focalRecovery?.appointment?.doctor_name}).
+                      <p className="text-slate-600 dark:text-slate-300 text-xs mt-1.5 leading-relaxed">
+                        Ephemeral offer dispatched to candidate <strong className="text-slate-900 dark:text-white font-bold">{candName}</strong> for <span className="font-bold text-slate-900 dark:text-white">{timeText}</span> slot ({doctorText} · {deptText}).
                       </p>
                     </div>
                   </div>
@@ -329,13 +350,13 @@ export const SlotRecoveryPage: React.FC<SlotRecoveryPageProps> = ({ onRefreshDat
                         setTenderSeconds(900);
                         showToast(`✓ Cascaded offer to next waitlist candidate`, 'info');
                       }}
-                      className="px-3.5 py-1.5 rounded-full border border-black/[0.08] dark:border-white/[0.1] text-xs font-medium text-[#1D1D1F] dark:text-white hover:bg-black/[0.03] dark:hover:bg-white/[0.05] transition-all"
+                      className="px-4 py-2 rounded-full border border-slate-300 dark:border-white/10 text-xs font-semibold text-slate-700 dark:text-white hover:bg-white dark:hover:bg-white/[0.05] transition-all active:scale-95 shadow-2xs"
                     >
                       Cascade to Next
                     </button>
                     <button
                       onClick={() => handleExecuteWaitlistMatch(focalRecovery.id, currentCandidate.id)}
-                      className="px-4 py-1.5 rounded-full bg-[#4F8A70] hover:bg-[#3D6E58] text-white text-xs font-medium shadow-sm transition-all flex items-center gap-1.5"
+                      className="px-5 py-2 rounded-full bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold shadow-sm transition-all flex items-center gap-1.5 active:scale-95"
                     >
                       <UserCheck className="h-3.5 w-3.5" />
                       <span>Lock & Confirm Slot</span>
@@ -347,7 +368,7 @@ export const SlotRecoveryPage: React.FC<SlotRecoveryPageProps> = ({ onRefreshDat
           )}
 
           {/* Slots Cards Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {filteredSlots.map(item => {
               const app = item.appointment;
               const pat = app?.patient;
@@ -356,85 +377,122 @@ export const SlotRecoveryPage: React.FC<SlotRecoveryPageProps> = ({ onRefreshDat
               const isWaitlistAction = item.action_type === 'WAITLIST';
               const isDoubleBookAction = item.action_type === 'DOUBLE_BOOK';
 
+              const patientName = pat ? `${pat.first_name} ${pat.last_name}` : `Patient #${item.appointment_id}`;
+              const initials = pat ? `${pat.first_name?.[0] || ''}${pat.last_name?.[0] || ''}` : 'PT';
+              const doctorName = app?.doctor_name || 'Dr. Sharma';
+              const department = app?.department || 'General Medicine';
+              const appointmentTime = app?.appointment_time || '10:30 AM';
+              const appointmentDate = app?.appointment_date || 'Today';
+              const slotValue = app?.estimated_slot_value || 2500;
+              const daysLead = app?.days_in_advance ? `${app.days_in_advance} days lead` : 'Same-day booking';
+
               // Matching waitlist count
-              const matchingCandidates = waitlist.filter(w => w.department === app?.department && w.status === 'Waiting');
+              const matchingCandidates = waitlist.filter(w => w.department === department && w.status === 'Waiting');
               const matchCount = matchingCandidates.length;
 
               return (
                 <div
                   key={item.id}
-                  className={`p-6 rounded-2xl bg-white/70 dark:bg-[#181818]/70 backdrop-blur-xl border flex flex-col justify-between transition-all ${
+                  className={`p-6 sm:p-7 rounded-[28px] bg-white dark:bg-[#181818] border flex flex-col justify-between transition-all ${
                     isExecuted
-                      ? 'border-[#4F8A70]/30 opacity-90'
-                      : 'border-white/60 dark:border-white/10 shadow-[0_8px_25px_rgba(0,0,0,0.03)] hover:shadow-[0_12px_32px_rgba(0,0,0,0.06)]'
+                      ? 'border-emerald-300 dark:border-emerald-800/60 shadow-xs'
+                      : 'border-slate-200/90 dark:border-white/10 shadow-[0_8px_30px_-6px_rgba(15,23,42,0.06)] hover:shadow-[0_16px_40px_-8px_rgba(15,23,42,0.1)]'
                   }`}
                 >
                   <div className="space-y-4">
-                    {/* Header: Time, Doctor, Risk */}
-                    <div className="flex items-start justify-between pb-3 border-b border-black/[0.05] dark:border-white/[0.06]">
+                    {/* Header: Time, Doctor, Department & Risk */}
+                    <div className="flex items-start justify-between pb-3.5 border-b border-slate-100 dark:border-white/[0.06]">
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="text-xl font-semibold text-[#1D1D1F] dark:text-white tracking-tight">
-                            {app?.appointment_time || '10:30 AM'}
+                          <span className="text-2xl font-bold text-slate-900 dark:text-white tracking-tight">
+                            {appointmentTime}
                           </span>
-                          <span className="text-xs text-[#6B6B6F]">· {app?.appointment_date}</span>
+                          <span className="text-xs font-medium text-slate-500 bg-slate-100 dark:bg-white/10 px-2 py-0.5 rounded-md">
+                            {appointmentDate}
+                          </span>
                         </div>
-                        <p className="text-xs text-[#6B6B6F] mt-0.5">
-                          {app?.doctor_name} · {app?.department}
-                        </p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-xs font-semibold text-slate-800 dark:text-slate-200 flex items-center gap-1">
+                            <Stethoscope className="w-3.5 h-3.5 text-slate-500" />
+                            {doctorName}
+                          </span>
+                          <span className="text-slate-300 dark:text-slate-700">·</span>
+                          <span className="text-xs text-slate-600 dark:text-slate-400 font-medium">
+                            {department}
+                          </span>
+                        </div>
                       </div>
 
                       <div className="text-right">
-                        <div className="text-base font-semibold text-[#C9685B]">
-                          {prob}% Risk
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-50 dark:bg-rose-950/50 border border-rose-200 dark:border-rose-900 text-rose-700 dark:text-rose-400 font-bold text-xs">
+                          <span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
+                          <span>{prob}% Risk</span>
                         </div>
-                        <span className="text-[10px] text-[#6B6B6F] uppercase block mt-0.5">
-                          {app?.confirmation_status || 'Not confirmed'}
+                        <span className="text-[10px] font-mono text-slate-400 uppercase block mt-1">
+                          {app?.confirmation_status || 'Unconfirmed'}
                         </span>
                       </div>
                     </div>
 
-                    {/* Patient info */}
-                    <div className="flex items-center justify-between text-xs">
-                      <div>
-                        <span className="text-[10px] uppercase font-bold text-[#6B6B6F] block">Scheduled Patient</span>
-                        <div className="font-semibold text-sm text-[#1D1D1F] dark:text-white mt-0.5">
-                          {pat?.first_name} {pat?.last_name}
+                    {/* Scheduled Patient Card */}
+                    <div className="p-4 rounded-2xl bg-slate-50 dark:bg-white/[0.03] border border-slate-200/70 dark:border-white/[0.06] flex items-center justify-between gap-3 text-xs">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <div className="w-9 h-9 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs shrink-0 shadow-xs">
+                          {initials}
                         </div>
-                        <span className="text-[11px] text-[#6B6B6F]">
-                          Prior missed: <span className="font-semibold text-[#C9685B]">{pat?.missed_appointments || 0}</span> · Booking gap: {app?.days_in_advance}d
-                        </span>
+                        <div className="min-w-0">
+                          <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
+                            Scheduled Patient
+                          </span>
+                          <h4 className="font-bold text-sm text-slate-900 dark:text-white truncate">
+                            {patientName}
+                          </h4>
+                          <div className="flex items-center gap-2 text-[11px] text-slate-500 mt-0.5">
+                            <span>
+                              Prior missed: <strong className={pat && pat.missed_appointments > 0 ? "text-rose-600" : "text-emerald-600"}>{pat?.missed_appointments ?? 0}</strong>
+                            </span>
+                            <span>•</span>
+                            <span>{daysLead}</span>
+                          </div>
+                        </div>
                       </div>
 
-                      <div className="text-right">
-                        <span className="text-[10px] uppercase font-bold text-[#6B6B6F] block">Potential Value</span>
-                        <div className="font-semibold text-sm text-[#1D1D1F] dark:text-white mt-0.5">
-                          ₹{(app?.estimated_slot_value || 2500).toLocaleString('en-IN')}
-                        </div>
+                      <div className="text-right shrink-0">
+                        <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 block">
+                          Slot Value
+                        </span>
+                        <span className="font-mono font-bold text-base text-slate-900 dark:text-white">
+                          ₹{slotValue.toLocaleString('en-IN')}
+                        </span>
                       </div>
                     </div>
 
-                    {/* AI Recommendation */}
-                    <div className="p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.04] dark:border-white/[0.06] space-y-1 text-xs">
-                      <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-[#647A8A]">
-                        <Sparkles className="h-3.5 w-3.5" />
-                        <span>AI Recommendation: {isExecuted ? 'RECOVERED' : item.recommendation}</span>
+                    {/* Clinical Decision Protocol */}
+                    <div className="p-3.5 rounded-2xl bg-slate-100/70 dark:bg-white/[0.03] border border-slate-200/80 dark:border-white/[0.06] space-y-1 text-xs">
+                      <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-400">
+                        <div className="flex items-center gap-1.5">
+                          <ShieldCheck className="h-3.5 w-3.5 text-emerald-600" />
+                          <span>Clinical Protocol: {isExecuted ? 'CAPACITY RECOVERED' : item.recommendation}</span>
+                        </div>
+                        <span className="px-1.5 py-0.5 rounded text-[9px] font-mono bg-white dark:bg-white/10 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-transparent">
+                          {item.action_type}
+                        </span>
                       </div>
-                      <p className="text-[11px] text-[#6B6B6F] leading-relaxed">
+                      <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-relaxed font-medium">
                         {item.reasoning}
                       </p>
                     </div>
 
                     {/* Matching Waitlist Indicator */}
                     {!isExecuted && matchCount > 0 && (
-                      <div className="p-2.5 rounded-xl bg-[#4F8A70]/10 border border-[#4F8A70]/20 flex items-center justify-between text-xs">
+                      <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 flex items-center justify-between text-xs">
                         <div className="flex items-center gap-2">
-                          <UserCheck className="h-4 w-4 text-[#4F8A70]" />
-                          <span className="font-medium text-[#1D1D1F] dark:text-white">
-                            {matchCount} matching {matchCount === 1 ? 'patient' : 'patients'} available
+                          <UserCheck className="h-4 w-4 text-emerald-600" />
+                          <span className="font-semibold text-emerald-900 dark:text-emerald-200">
+                            {matchCount} standby {matchCount === 1 ? 'patient' : 'patients'} available in {department}
                           </span>
                         </div>
-                        <span className="text-[10px] text-[#4F8A70] font-semibold uppercase">
+                        <span className="text-[10px] text-emerald-700 dark:text-emerald-300 font-bold uppercase px-2 py-0.5 rounded bg-emerald-100 dark:bg-emerald-900/50">
                           Ready to backfill
                         </span>
                       </div>
@@ -442,10 +500,10 @@ export const SlotRecoveryPage: React.FC<SlotRecoveryPageProps> = ({ onRefreshDat
                   </div>
 
                   {/* Actions Footer */}
-                  <div className="pt-4 mt-4 flex items-center justify-between gap-2 border-t border-black/[0.05] dark:border-white/[0.06]">
+                  <div className="pt-4 mt-5 flex items-center justify-between gap-2 border-t border-slate-100 dark:border-white/[0.06]">
                     {isExecuted ? (
-                      <div className="flex items-center gap-1.5 text-xs text-[#4F8A70] font-semibold">
-                        <CheckCircle2 className="h-4 w-4" />
+                      <div className="flex items-center gap-2 text-xs text-emerald-700 dark:text-emerald-400 font-bold bg-emerald-50 dark:bg-emerald-950/40 px-3 py-1.5 rounded-full border border-emerald-200 dark:border-emerald-800">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                         <span>Slot Recovered (+₹{item.revenue_protected.toLocaleString('en-IN')})</span>
                       </div>
                     ) : (
@@ -454,7 +512,7 @@ export const SlotRecoveryPage: React.FC<SlotRecoveryPageProps> = ({ onRefreshDat
                           {isWaitlistAction && (
                             <button
                               onClick={() => setSelectedRecoveryForWaitlist(item)}
-                              className="px-3.5 py-1.5 bg-[#1D1D1F] hover:bg-[#2C2C2E] dark:bg-white dark:hover:bg-[#E5E5EA] text-white dark:text-[#1D1D1F] rounded-full text-xs font-medium transition-all shadow-sm flex items-center gap-1.5"
+                              className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-full text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
                             >
                               <UserCheck className="h-3.5 w-3.5" />
                               <span>Offer to Waitlist</span>
@@ -464,7 +522,7 @@ export const SlotRecoveryPage: React.FC<SlotRecoveryPageProps> = ({ onRefreshDat
                           {isDoubleBookAction && (
                             <button
                               onClick={() => setSelectedRecoveryForDoubleBook(item)}
-                              className="px-3.5 py-1.5 bg-[#C18A3A] hover:bg-[#A87630] text-white rounded-full text-xs font-medium transition-all shadow-sm flex items-center gap-1.5"
+                              className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-full text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
                             >
                               <Users className="h-3.5 w-3.5" />
                               <span>Controlled Double-Book</span>
@@ -473,14 +531,14 @@ export const SlotRecoveryPage: React.FC<SlotRecoveryPageProps> = ({ onRefreshDat
 
                           <button
                             onClick={() => handleKeepMonitoring(item)}
-                            className="px-3 py-1.5 border border-black/[0.08] dark:border-white/[0.1] text-xs font-medium text-[#6B6B6F] hover:text-[#1D1D1F] dark:hover:text-white rounded-full hover:bg-black/[0.03] dark:hover:bg-white/[0.05] transition-all"
+                            className="px-3.5 py-2 border border-slate-200 hover:border-slate-300 dark:border-white/10 text-xs font-semibold text-slate-700 dark:text-white rounded-full hover:bg-slate-50 dark:hover:bg-white/[0.05] transition-all"
                           >
                             Keep Monitoring
                           </button>
 
                           <button
                             onClick={() => setSlotToRelease(item)}
-                            className="px-3 py-1.5 border border-[#C9685B]/30 text-xs font-medium text-[#C9685B] hover:bg-[#C9685B]/10 rounded-full transition-all"
+                            className="px-3 py-2 border border-rose-200 hover:border-rose-300 text-xs font-semibold text-rose-700 hover:bg-rose-50 rounded-full transition-all"
                           >
                             Release Slot
                           </button>

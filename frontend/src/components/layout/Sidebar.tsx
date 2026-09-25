@@ -9,7 +9,7 @@ import {
   BarChart3,
   Lightbulb,
   Settings,
-  Sparkles,
+  PlayCircle,
   Activity,
   ChevronRight,
   Stethoscope
@@ -80,18 +80,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
 
-          {/* Demo Scenario CTA */}
+          {/* Workflow Simulator CTA */}
           <div className="px-1 pt-1.5 pb-2">
             <button
               onClick={onOpenDemoModal}
               className="w-full py-1.5 px-3 rounded-xl bg-black/[0.03] dark:bg-white/[0.04] hover:bg-black/[0.06] dark:hover:bg-white/[0.07] border border-black/[0.04] dark:border-white/[0.06] text-xs font-medium text-[#1D1D1F] dark:text-white flex items-center justify-between transition-all"
             >
               <div className="flex items-center gap-2">
-                <Sparkles className="h-3.5 w-3.5 text-[#647A8A]" />
-                <span className="text-[11px]">2-Min Interactive Demo</span>
+                <PlayCircle className="h-3.5 w-3.5 text-[#647A8A]" />
+                <span className="text-[11px]">Workflow Simulator</span>
               </div>
               <span className="text-[10px] text-[#6B6B6F] font-semibold">
-                Run →
+                Simulate →
               </span>
             </button>
           </div>

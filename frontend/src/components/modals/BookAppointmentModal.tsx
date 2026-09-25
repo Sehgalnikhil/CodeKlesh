@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { CalendarPlus, X, Sparkles } from 'lucide-react';
+import { CalendarPlus, X, ShieldCheck } from 'lucide-react';
 import { Patient } from '../../types';
 import { api } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
@@ -228,11 +228,11 @@ export const BookAppointmentModal: React.FC<BookAppointmentModalProps> = ({
               </div>
             </div>
 
-            {/* AI Callout note */}
+            {/* Predictive Risk Scoring note */}
             <div className="p-3 bg-brand-50/50 dark:bg-brand-950/30 border border-brand-100 dark:border-brand-900/50 rounded-xl flex items-start gap-2 text-xs text-zinc-600 dark:text-zinc-300">
-              <Sparkles className="h-4 w-4 text-brand-600 flex-shrink-0 mt-0.5" />
+              <ShieldCheck className="h-4 w-4 text-emerald-600 flex-shrink-0 mt-0.5" />
               <div>
-                <span className="font-semibold text-zinc-900 dark:text-zinc-100">AI Risk Scoring:</span> AttendAI will automatically analyze the patient's past attendance track record, commute distance, and lead time to score no-show risk upon creation.
+                <span className="font-semibold text-zinc-900 dark:text-zinc-100">Predictive Risk Scoring:</span> SlotSure will automatically analyze the patient's past attendance track record, commute distance, and lead time to score no-show risk upon creation.
               </div>
             </div>
 

@@ -17,7 +17,12 @@ import {
   Building2,
   FileText,
   Loader2,
-  Check
+  Check,
+  Compass,
+  MessageCircle,
+  Pill,
+  HeartPulse,
+  Zap,
 } from 'lucide-react';
 import { Appointment } from '../types';
 import { RiskBadge } from '../components/ui/RiskBadge';
@@ -34,6 +39,9 @@ interface PatientDetailDrawerProps {
   onViewPatientDirectory: (patientId: number) => void;
   onRefreshData: () => void;
   onOpenOutboundCall?: (app: Appointment) => void;
+  onOpenWhatsAppNegotiation?: (app: Appointment) => void;
+  onOpenJourneyRadar?: (app: Appointment) => void;
+  onOpenAzureDocScanner?: () => void;
 }
 
 export const PatientDetailDrawer: React.FC<PatientDetailDrawerProps> = ({
@@ -45,6 +53,9 @@ export const PatientDetailDrawer: React.FC<PatientDetailDrawerProps> = ({
   onViewPatientDirectory,
   onRefreshData,
   onOpenOutboundCall,
+  onOpenWhatsAppNegotiation,
+  onOpenJourneyRadar,
+  onOpenAzureDocScanner,
 }) => {
   const { showToast } = useAuth();
   const { emitEvent } = useActivityStream();
@@ -53,6 +64,44 @@ export const PatientDetailDrawer: React.FC<PatientDetailDrawerProps> = ({
   const [isQueuingCall, setIsQueuingCall] = useState(false);
   const [callQueued, setCallQueued] = useState(false);
   const [reminderSentInfo, setReminderSentInfo] = useState<{ time: string; channel: string } | null>(null);
+  const [azureInsights, setAzureInsights] = useState<any | null>(null);
+  const [isAnalyzingAzure, setIsAnalyzingAzure] = useState(false);
+  const [followUpScheduled, setFollowUpScheduled] = useState(false);
+
+  const handleRunAzureHealthInsights = async () => {
+    try {
+      setIsAnalyzingAzure(true);
+      const textToAnalyze =
+        appointment?.notes ||
+        `Patient ${appointment?.patient?.first_name || 'Aarav'} presents for ${appointment?.department || 'General Medicine'} evaluation. Complains of persistent cough and fever for 3 days. Denies chest pain or shortness of breath. Prescribed Azithromycin 500mg.`;
+      const res = await api.azureHealthInsights(textToAnalyze, appointment?.id);
+      setAzureInsights(res);
+      showToast('Azure AI Text Analytics for Health extracted clinical entities', 'success');
+    } catch (err: any) {
+      showToast(err.message || 'Failed to extract Azure clinical entities', 'error');
+    } finally {
+      setIsAnalyzingAzure(false);
+    }
+  };
+
+  const handleScheduleFollowUp = () => {
+    const pName = appointment?.patient
+      ? `${appointment.patient.first_name} ${appointment.patient.last_name}`
+      : `Patient #${appointment?.patient_id}`;
+    setFollowUpScheduled(true);
+    showToast(
+      `7-Day clinical adherence check scheduled for ${pName}`,
+      'success'
+    );
+    emitEvent({
+      type: 'REMINDER',
+      title: '7-Day Follow-Up Scheduled',
+      description: `💊 7-Day clinical adherence check scheduled for ${pName} (+7 days).`,
+      patientName: pName,
+      badge: 'Adherence',
+      badgeColor: 'emerald',
+    });
+  };
 
   if (!isOpen || !appointment) return null;
 
@@ -430,6 +479,233 @@ export const PatientDetailDrawer: React.FC<PatientDetailDrawerProps> = ({
               </div>
             </div>
 
+            {/* Autonomous Patient Engagement & Live Radar */}
+            <div className="p-5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.08] space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[#6B6B6F]">
+                  Patient Outreach & Attendance Protocol
+                </span>
+                <span className="text-[10px] font-mono text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                  CLINICAL PROTOCOL ACTIVE
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                {/* WhatsApp Outpatient Desk Button */}
+                {onOpenWhatsAppNegotiation && (
+                  <button
+                    onClick={() => onOpenWhatsAppNegotiation(appointment)}
+                    className="p-3.5 rounded-xl bg-emerald-50 hover:bg-emerald-100/90 active:scale-95 border border-emerald-200/80 text-left transition-all shadow-2xs group flex flex-col justify-between"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shadow-xs">
+                        <MessageCircle className="w-4 h-4" />
+                      </div>
+                      <span className="text-[10px] font-mono font-bold text-emerald-700 bg-emerald-100/80 px-1.5 py-0.5 rounded">
+                        WhatsApp
+                      </span>
+                    </div>
+                    <div className="mt-2.5">
+                      <h5 className="font-bold text-xs text-emerald-950 group-hover:text-emerald-900">
+                        WhatsApp Outpatient Desk
+                      </h5>
+                      <p className="text-[11px] text-emerald-700/90 mt-0.5 leading-snug">
+                        Two-way patient messaging & slot coordination
+                      </p>
+                    </div>
+                  </button>
+                )}
+
+                {/* Patient Live Journey Radar Button */}
+                {onOpenJourneyRadar && (
+                  <button
+                    onClick={() => onOpenJourneyRadar(appointment)}
+                    className="p-3.5 rounded-xl bg-slate-100 hover:bg-slate-200/80 active:scale-95 border border-slate-200 text-left transition-all shadow-2xs group flex flex-col justify-between"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="w-7 h-7 rounded-lg bg-slate-900 text-white flex items-center justify-center shadow-xs">
+                        <Compass className="w-4 h-4" />
+                      </div>
+                      <span className="text-[10px] font-mono font-bold text-slate-700 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                        Live PWA
+                      </span>
+                    </div>
+                    <div className="mt-2.5">
+                      <h5 className="font-bold text-xs text-slate-900 group-hover:text-slate-800">
+                        Live Journey Radar
+                      </h5>
+                      <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">
+                        Swiggy-style queue tracker & buffer swap
+                      </p>
+                    </div>
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* Pre-Consultation Intake & Reported Symptoms */}
+            <div className="p-4 rounded-2xl bg-amber-500/5 border border-amber-500/20 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FileText className="w-4 h-4 text-amber-700" />
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-amber-900">
+                    Pre-Consultation Intake & Symptoms
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono text-amber-800 bg-amber-100/80 px-2 py-0.5 rounded-full border border-amber-200">
+                  WhatsApp Ingested
+                </span>
+              </div>
+              <div className="text-xs text-stone-700 bg-white/90 p-3 rounded-xl border border-stone-200/80 leading-relaxed font-sans shadow-2xs">
+                {appointment.notes ? (
+                  <div>
+                    <span className="font-semibold text-stone-900">Recorded Chief Complaints / Token:</span>
+                    <p className="mt-1 text-stone-700">{appointment.notes}</p>
+                  </div>
+                ) : (
+                  <span className="text-stone-400 italic">
+                    No pre-consultation symptoms recorded yet. Patient can submit symptoms or prior prescriptions directly via the WhatsApp concierge.
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Microsoft Azure AI Health Intelligence & Entity Radar */}
+            <div className="p-4 rounded-2xl bg-sky-500/5 border border-sky-500/25 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg bg-sky-500/15 border border-sky-500/30 flex items-center justify-center text-sky-700">
+                    <Zap className="w-3.5 h-3.5 text-sky-600" />
+                  </div>
+                  <div>
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-sky-950 block">
+                      Azure AI Text Analytics for Health
+                    </span>
+                    <span className="text-[10px] text-sky-700">
+                      Cognitive Clinical NLP & Entity Assertion
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleRunAzureHealthInsights}
+                  disabled={isAnalyzingAzure}
+                  className="px-2.5 py-1 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-[10px] font-semibold flex items-center gap-1 transition-all shadow-xs active:scale-95 disabled:opacity-50"
+                >
+                  {isAnalyzingAzure ? (
+                    <>
+                      <Loader2 className="w-3 h-3 animate-spin" />
+                      Analyzing...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3 h-3 text-sky-200" />
+                      Analyze Notes
+                    </>
+                  )}
+                </button>
+              </div>
+
+              {azureInsights ? (
+                <div className="space-y-2.5 pt-1">
+                  {/* Triage Summary */}
+                  <div className="p-2.5 rounded-xl bg-white border border-sky-100 text-xs text-sky-950 leading-relaxed shadow-2xs">
+                    <p className="font-semibold text-[11px] text-sky-900 mb-0.5">Azure Clinical Interpretation:</p>
+                    <p className="text-stone-700">{azureInsights.clinical_triage}</p>
+                  </div>
+
+                  {/* Extracted Entities */}
+                  <div className="space-y-1.5">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-stone-500">
+                      Extracted Medical Entities ({azureInsights.entities?.length || 0})
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {azureInsights.entities?.map((ent: any, idx: number) => {
+                        const isNegated = ent.assertion && ent.assertion.toLowerCase().includes('negat');
+                        return (
+                          <div
+                            key={idx}
+                            className={`px-2 py-1 rounded-lg text-[10px] font-medium border flex items-center gap-1.5 ${
+                              isNegated
+                                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                                : ent.category === 'Medication'
+                                ? 'bg-amber-50 text-amber-900 border-amber-200'
+                                : 'bg-sky-50 text-sky-900 border-sky-200'
+                            }`}
+                          >
+                            <span className="font-bold">{ent.text}</span>
+                            <span className="text-[9px] opacity-75">[{ent.category}]</span>
+                            {ent.code && <span className="font-mono text-[9px] opacity-80 font-bold">{ent.code}</span>}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Document scanner trigger */}
+                  {onOpenAzureDocScanner && (
+                    <button
+                      type="button"
+                      onClick={onOpenAzureDocScanner}
+                      className="w-full mt-2 py-2 px-3 rounded-xl bg-white hover:bg-sky-50 text-sky-800 border border-sky-200 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-2xs"
+                    >
+                      <FileText className="w-3.5 h-3.5 text-sky-600" />
+                      Scan Prescriptions/Lab PDFs via Azure AI Document Intelligence
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <div className="p-3 bg-white/70 border border-sky-100 rounded-xl flex items-center justify-between text-xs text-stone-600">
+                  <span>Click "Analyze Notes" to parse clinical entities, ICD-10 codes, and negations via Azure.</span>
+                  {onOpenAzureDocScanner && (
+                    <button
+                      type="button"
+                      onClick={onOpenAzureDocScanner}
+                      className="text-sky-700 hover:text-sky-900 font-semibold underline text-[11px] whitespace-nowrap ml-2"
+                    >
+                      Scan Rx / Labs
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Post-Consultation 7-Day Medicine Adherence */}
+            <div className="p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/20 space-y-2.5">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Pill className="w-4 h-4 text-emerald-700" />
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-950">
+                    7-Day Medicine Adherence & Recovery
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono text-emerald-800 bg-emerald-100/80 px-2 py-0.5 rounded-full border border-emerald-200">
+                  Post-OP Protocol
+                </span>
+              </div>
+              <p className="text-xs text-stone-600 leading-snug">
+                Automates an interactive WhatsApp adherence survey 7 days post-appointment to verify prescription completion and recovery markers.
+              </p>
+              {followUpScheduled ? (
+                <div className="p-2.5 rounded-xl bg-emerald-100/70 border border-emerald-300 flex items-center justify-between text-xs text-emerald-900 font-medium">
+                  <span className="flex items-center gap-1.5">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-700" />
+                    7-Day Adherence Check Scheduled
+                  </span>
+                  <span className="text-[11px] text-emerald-700 font-mono">T+7 Days</span>
+                </div>
+              ) : (
+                <button
+                  onClick={handleScheduleFollowUp}
+                  className="w-full py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 transition-all shadow-xs"
+                >
+                  <HeartPulse className="w-3.5 h-3.5" />
+                  Schedule 7-Day Adherence Check
+                </button>
+              )}
+            </div>
+
             {/* Multi-Channel Outreach Escalation Cascade */}
             <div className="p-5 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.04] dark:border-white/[0.06] space-y-3">
               <div className="flex items-center justify-between">
@@ -476,10 +752,10 @@ export const PatientDetailDrawer: React.FC<PatientDetailDrawerProps> = ({
                     {onOpenOutboundCall && (
                       <button
                         onClick={() => onOpenOutboundCall(appointment)}
-                        className="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-[10px] font-semibold transition-all flex items-center gap-1 shadow-xs active:scale-95"
+                        className="px-2.5 py-1 bg-[#1D1D1F] hover:bg-[#333336] text-white rounded-lg text-[10px] font-semibold transition-all flex items-center gap-1 shadow-xs active:scale-95"
                       >
                         <PhoneForwarded className="h-3 w-3" />
-                        <span>AI Call Now</span>
+                        <span>Call Patient</span>
                       </button>
                     )}
                     {callQueued ? (

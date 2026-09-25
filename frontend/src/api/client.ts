@@ -7,7 +7,10 @@ import {
   SlotRecoveryItem,
   AnalyticsResponse,
   ModelMetricsResponse,
-  User
+  User,
+  WhatsAppNegotiateResponse,
+  QueueRadarResponse,
+  QueueDelayResponse
 } from '../types';
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
@@ -316,5 +319,157 @@ export const api = {
   }> {
     const q = callSid ? `?call_sid=${callSid}` : '';
     return request(`/voice/call-status/${appointmentId}${q}`);
+  },
+
+  // WhatsApp AI Negotiation Concierge
+  async whatsappNegotiate(payload: {
+    appointment_id: number;
+    user_message: string;
+    conversation_history?: Array<{ role: string; content: string }>;
+    preferred_language?: string;
+  }): Promise<WhatsAppNegotiateResponse> {
+    return request('/whatsapp/negotiate', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  async getWhatsAppThread(appointmentId: number): Promise<{
+    appointment_id: number;
+    patient_name: string;
+    phone: string;
+    doctor_name: string;
+    appointment_date: string;
+    appointment_time: string;
+    confirmation_status: string;
+    messages: Array<{
+      sender: string;
+      text: string;
+      timestamp: string;
+      status?: string;
+    }>;
+  }> {
+    return request(`/whatsapp/messages/${appointmentId}`);
+  },
+
+  // Patient Live Journey Radar
+  async getQueueRadar(appointmentId: number): Promise<QueueRadarResponse> {
+    return request(`/queue/${appointmentId}/radar`);
+  },
+
+  async requestQueueDelay(appointmentId: number, delayMinutes: number, reason?: string): Promise<QueueDelayResponse> {
+    return request(`/queue/${appointmentId}/delay-buffer`, {
+      method: 'POST',
+      body: JSON.stringify({ delay_minutes: delayMinutes, reason }),
+    });
+  },
+
+  async broadcastDoctorDelay(payload: {
+    doctor_name: string;
+    delay_minutes: number;
+    reason?: string;
+  }): Promise<{
+    success: boolean;
+    doctor_name: string;
+    delay_minutes: number;
+    reason?: string;
+    affected_count: number;
+    affected_patients: Array<{
+      id: number;
+      patient_name: string;
+      original_time: string;
+      adjusted_time: string;
+    }>;
+    message: string;
+  }> {
+    return request('/queue/broadcast-delay', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
+  },
+
+  // Microsoft Azure AI Suite (Text Analytics for Health, Speech, Document Intelligence)
+  async azureGetStatus(): Promise<{
+    status: string;
+    live_azure_connected: boolean;
+    services: Array<{
+      name: string;
+      capability: string;
+      tier: string;
+      status: string;
+    }>;
+  }> {
+    return request('/azure/status');
+  },
+
+  async azureHealthInsights(text: string, appointmentId?: number): Promise<{
+    source: string;
+    is_live_azure: boolean;
+    analyzed_text: string;
+    entity_count: number;
+    entities: Array<{
+      text: string;
+      category: string;
+      assertion?: string;
+      confidence: number;
+      code?: string;
+      dosage?: string;
+      frequency?: string;
+      duration?: string;
+    }>;
+    negated_findings?: string[];
+    clinical_triage: string;
+    fhir_bundle_compatible: boolean;
+  }> {
+    return request('/azure/health-insights', {
+      method: 'POST',
+      body: JSON.stringify({ text, appointment_id: appointmentId }),
+    });
+  },
+
+  async azureTextToSpeech(text: string, voice?: string): Promise<{
+    success: boolean;
+    provider: string;
+    voice: string;
+    voice_display_name?: string;
+    audio_base64: string | null;
+    format: string;
+    text: string;
+    is_live: boolean;
+  }> {
+    return request('/azure/tts', {
+      method: 'POST',
+      body: JSON.stringify({ text, voice: voice || 'en-IN-NeerjaNeural' }),
+    });
+  },
+
+  async azureAnalyzeDocument(payload: {
+    sample_type?: string;
+    file_base64?: string;
+  }): Promise<{
+    document_type: string;
+    document_model: string;
+    confidence_score: number;
+    patient_name: string;
+    doctor_name?: string;
+    lab_name?: string;
+    vitals?: Record<string, string>;
+    diagnoses?: string[];
+    medications?: Array<{ name: string; regimen: string; status: string }>;
+    biomarkers?: Array<{
+      marker: string;
+      value: string;
+      reference: string;
+      status: string;
+      clinical_flag: string;
+      risk_impact: string;
+    }>;
+    clinical_summary?: string;
+    warnings?: string[];
+  }> {
+    return request('/azure/analyze-document', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    });
   },
 };

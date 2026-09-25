@@ -71,7 +71,7 @@ export const SettingsPage: React.FC = () => {
           </div>
 
           <p className="text-xs text-zinc-500">
-            Reminders dispatched by staff are handled by the AttendAI clinical notification engine. In production, connect Twilio and WhatsApp Business API credentials.
+            Reminders dispatched by staff are handled by the SlotSure clinical notification engine. In production, connect Twilio and WhatsApp Business API credentials.
           </p>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">

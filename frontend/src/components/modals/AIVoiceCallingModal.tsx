@@ -7,7 +7,7 @@ import {
   MicOff,
   Volume2,
   VolumeX,
-  Sparkles,
+  RefreshCw,
   Calendar,
   Clock,
   CheckCircle2,
@@ -383,7 +383,7 @@ export const AIVoiceCallingModal: React.FC<AIVoiceCallingModalProps> = ({
               <div>
                 <div className="flex items-center gap-2">
                   <h3 className="text-sm font-semibold text-[#1D1D1F] dark:text-white">
-                    Clinical AI Voice Reception Desk
+                    Clinical Voice Reception Desk
                   </h3>
                   <span className="flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-ping" />
@@ -454,7 +454,7 @@ export const AIVoiceCallingModal: React.FC<AIVoiceCallingModalProps> = ({
                   </span>
                 ) : callStatus === 'PROCESSING' ? (
                   <span className="text-amber-700 flex items-center gap-1.5">
-                    <Sparkles className="h-3.5 w-3.5 animate-spin" />
+                    <RefreshCw className="h-3.5 w-3.5 animate-spin" />
                     Matching Clinical Schedules...
                   </span>
                 ) : (

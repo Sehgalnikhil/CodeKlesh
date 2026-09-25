@@ -6,7 +6,7 @@ import {
   UserPlus,
   ShieldAlert,
   AlertTriangle,
-  Sparkles,
+  PlayCircle,
   ArrowRight,
   User,
   Moon,
@@ -125,8 +125,8 @@ export const CommandPaletteModal: React.FC<CommandPaletteModalProps> = ({
     },
     {
       id: 'demo',
-      label: 'Run 2-Minute Demo Scenario',
-      icon: <Sparkles className="h-4 w-4 text-[#647A8A]" />,
+      label: 'Run Clinical Workflow Simulation',
+      icon: <PlayCircle className="h-4 w-4 text-[#647A8A]" />,
       action: () => {
         onClose();
         onOpenDemoModal();

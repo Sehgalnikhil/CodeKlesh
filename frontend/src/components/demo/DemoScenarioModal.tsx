@@ -394,32 +394,33 @@ export const DemoScenarioModal: React.FC<DemoScenarioModalProps> = ({
           {/* Footer Controls */}
           <div className="p-4 border-t border-black/[0.06] dark:border-white/[0.08] bg-black/[0.01] dark:bg-white/[0.02] flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <button
-                onClick={() => {
-                  setCurrentStage(1);
-                  setAutoPlaying(true);
-                }}
-                className="px-3.5 py-1.5 border border-black/[0.08] dark:border-white/[0.1] hover:bg-black/[0.03] dark:hover:bg-white/[0.05] rounded-full text-xs font-medium text-[#1D1D1F] dark:text-white flex items-center gap-1.5 transition-all"
-              >
-                {autoPlaying ? (
-                  <span>Auto-Playing ({currentStage}/8)...</span>
-                ) : (
-                  <>
-                    <Play className="h-3 w-3" />
-                    <span>Auto-Play</span>
-                  </>
-                )}
-              </button>
+              {autoPlaying ? (
+                <button
+                  onClick={() => setAutoPlaying(false)}
+                  className="px-4 py-1.5 bg-amber-500 hover:bg-amber-600 rounded-full text-xs font-semibold text-white flex items-center gap-1.5 transition-all shadow-sm"
+                >
+                  <span>Pause</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => setAutoPlaying(true)}
+                  className="px-4 py-1.5 border border-stone-300 hover:bg-stone-200 rounded-full text-xs font-semibold text-graphite-900 flex items-center gap-1.5 transition-all"
+                >
+                  <Play className="h-3 w-3" />
+                  <span>Play Demo</span>
+                </button>
+              )}
 
               <button
                 onClick={() => {
                   setCurrentStage(1);
                   setAutoPlaying(false);
                 }}
-                className="p-1.5 rounded-full text-[#6B6B6F] hover:text-[#1D1D1F] dark:hover:text-white"
-                title="Reset scenario"
+                className="px-3.5 py-1.5 rounded-full border border-stone-300 hover:bg-stone-200 text-xs font-semibold text-graphite-900 flex items-center gap-1 transition-all"
+                title="Restart scenario from stage 1"
               >
-                <RotateCcw className="h-3.5 w-3.5" />
+                <RotateCcw className="h-3 w-3" />
+                <span>Restart</span>
               </button>
             </div>
 

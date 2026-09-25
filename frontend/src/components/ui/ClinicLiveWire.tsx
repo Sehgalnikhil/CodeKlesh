@@ -16,7 +16,7 @@ import {
 import { useActivityStream, ActivityEvent } from '../../context/ActivityStreamContext';
 
 export const ClinicLiveWire: React.FC = () => {
-  const { events, clearEvents } = useActivityStream();
+  const { events, clearEvents, isConnected, latencyMs } = useActivityStream();
   const [isOpen, setIsOpen] = useState(false);
 
   const latestEvent = events[0];
@@ -46,18 +46,21 @@ export const ClinicLiveWire: React.FC = () => {
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
           onClick={() => setIsOpen(prev => !prev)}
-          className="px-3.5 py-2 rounded-full bg-white/85 dark:bg-[#181818]/90 backdrop-blur-2xl border border-white/80 dark:border-white/10 shadow-[0_12px_32px_rgba(0,0,0,0.12)] cursor-pointer hover:bg-white/95 dark:hover:bg-[#202020] transition-all flex items-center gap-2.5 text-xs group"
+          className="px-3.5 py-2 rounded-full bg-white/90 dark:bg-[#181818]/90 backdrop-blur-2xl border border-white/80 dark:border-white/10 shadow-[0_12px_32px_rgba(0,0,0,0.12)] cursor-pointer hover:bg-white dark:hover:bg-[#202020] transition-all flex items-center gap-2.5 text-xs group"
         >
           <span className="relative flex h-2 w-2">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#4F8A70] opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-[#4F8A70]"></span>
+            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${isConnected ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+            <span className={`relative inline-flex rounded-full h-2 w-2 ${isConnected ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
           </span>
 
-          <span className="font-semibold text-[#1D1D1F] dark:text-white tracking-tight">
-            LiveWire:
+          <span className="font-semibold text-[#1D1D1F] dark:text-white tracking-tight flex items-center gap-1">
+            LiveWire
+            <span className="text-[10px] font-mono text-emerald-700 bg-emerald-50 px-1.5 py-0.2 rounded border border-emerald-200">
+              {latencyMs}ms
+            </span>
           </span>
 
-          <span className="text-[#6B6B6F] max-w-[200px] sm:max-w-[280px] truncate">
+          <span className="text-[#6B6B6F] max-w-[180px] sm:max-w-[240px] truncate">
             {latestEvent ? latestEvent.title : 'All systems operating'}
           </span>
 
@@ -84,8 +87,8 @@ export const ClinicLiveWire: React.FC = () => {
                   <h3 className="text-xs font-semibold text-[#1D1D1F] dark:text-white">
                     Clinical Operations LiveWire Feed
                   </h3>
-                  <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[#4F8A70]/10 text-[#4F8A70] font-medium">
-                    Live
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-semibold border border-emerald-200">
+                    ⚡ SSE {latencyMs}ms
                   </span>
                 </div>
 

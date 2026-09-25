@@ -50,10 +50,10 @@ class Appointment(Base):
     __tablename__ = "appointments"
 
     id = Column(Integer, primary_key=True, index=True)
-    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
-    doctor_name = Column(String(100), nullable=False)
-    department = Column(String(100), nullable=False)
-    appointment_date = Column(String(20), nullable=False) # YYYY-MM-DD
+    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False, index=True)
+    doctor_name = Column(String(100), nullable=False, index=True)
+    department = Column(String(100), nullable=False, index=True)
+    appointment_date = Column(String(20), nullable=False, index=True) # YYYY-MM-DD
     appointment_time = Column(String(20), nullable=False) # e.g. "10:30 AM"
     appointment_type = Column(String(100), default="Follow-up")
     booking_date = Column(String(20), nullable=False)
@@ -62,10 +62,10 @@ class Appointment(Base):
     email_reminder_sent = Column(Boolean, default=False)
     
     # Status & Slot Recovery fields
-    status = Column(String(50), default="Scheduled") # Scheduled, Completed, Cancelled, No-Show
-    confirmation_status = Column(String(50), default="Not confirmed") # "Confirmed", "Not confirmed", "Pending_Reply"
+    status = Column(String(50), default="Scheduled", index=True) # Scheduled, Completed, Cancelled, No-Show
+    confirmation_status = Column(String(50), default="Not confirmed", index=True) # "Confirmed", "Not confirmed", "Pending_Reply"
     is_double_booked = Column(Boolean, default=False)
-    recovery_status = Column(String(50), default="Normal") # "Normal", "At_Risk", "Recovered", "Double_Booked"
+    recovery_status = Column(String(50), default="Normal", index=True) # "Normal", "At_Risk", "Recovered", "Double_Booked"
     estimated_slot_value = Column(Integer, default=2500) # In INR
 
     notes = Column(Text, nullable=True)
@@ -80,9 +80,9 @@ class Prediction(Base):
     __tablename__ = "predictions"
 
     id = Column(Integer, primary_key=True, index=True)
-    appointment_id = Column(Integer, ForeignKey("appointments.id"), unique=True, nullable=False)
+    appointment_id = Column(Integer, ForeignKey("appointments.id"), unique=True, nullable=False, index=True)
     risk_probability = Column(Float, nullable=False)
-    risk_level = Column(String(20), nullable=False) # LOW, MEDIUM, HIGH
+    risk_level = Column(String(20), nullable=False, index=True) # LOW, MEDIUM, HIGH
     top_factors = Column(JSON, nullable=False)
     recommended_action = Column(String(255), nullable=False)
     recommended_strategy = Column(String(100), default="Standard SMS")
@@ -95,11 +95,11 @@ class Reminder(Base):
     __tablename__ = "reminders"
 
     id = Column(Integer, primary_key=True, index=True)
-    appointment_id = Column(Integer, ForeignKey("appointments.id"), nullable=False)
-    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
+    appointment_id = Column(Integer, ForeignKey("appointments.id"), nullable=False, index=True)
+    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False, index=True)
     channel = Column(String(50), default="SMS")
     strategy = Column(String(100), default="Standard Reminder")
-    status = Column(String(50), default="Scheduled")
+    status = Column(String(50), default="Scheduled", index=True)
     scheduled_for = Column(String(50), nullable=False)
     sent_at = Column(DateTime, nullable=True)
     notes = Column(Text, nullable=True)
@@ -112,14 +112,14 @@ class Waitlist(Base):
     __tablename__ = "waitlist"
 
     id = Column(Integer, primary_key=True, index=True)
-    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False)
-    doctor_name = Column(String(100), nullable=False)
-    department = Column(String(100), nullable=False)
-    preferred_date = Column(String(20), nullable=False) # YYYY-MM-DD or "Any"
+    patient_id = Column(Integer, ForeignKey("patients.id"), nullable=False, index=True)
+    doctor_name = Column(String(100), nullable=False, index=True)
+    department = Column(String(100), nullable=False, index=True)
+    preferred_date = Column(String(20), nullable=False, index=True) # YYYY-MM-DD or "Any"
     preferred_time_range = Column(String(50), default="10:00 AM - 01:00 PM")
     appointment_type = Column(String(100), default="Consultation")
     priority = Column(String(20), default="Medium") # Urgent, High, Medium, Low
-    status = Column(String(50), default="Waiting") # Waiting, Offered, Booked, Expired
+    status = Column(String(50), default="Waiting", index=True) # Waiting, Offered, Booked, Expired
     contact_status = Column(String(50), default="Ready") # Ready, Contacted, Awaiting Reply
     notes = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)

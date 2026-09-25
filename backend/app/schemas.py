@@ -139,11 +139,37 @@ class SlotRecoveryExecuteRequest(BaseModel):
     waitlist_candidate_id: Optional[int] = None
     notes: Optional[str] = None
 
+class AppointmentInRecoveryResponse(BaseModel):
+    id: int
+    patient_id: int
+    doctor_name: str
+    department: str
+    appointment_date: str
+    appointment_time: str
+    appointment_type: str
+    booking_date: str
+    days_in_advance: int
+    sms_reminder_sent: bool
+    email_reminder_sent: bool
+    status: str
+    confirmation_status: str
+    is_double_booked: bool
+    recovery_status: str
+    estimated_slot_value: int
+    notes: Optional[str] = None
+    created_at: datetime
+    patient: Optional[PatientResponse] = None
+    prediction: Optional[PredictionResponse] = None
+
+    class Config:
+        from_attributes = True
+
 class SlotRecoveryResponse(SlotRecoveryBase):
     id: int
     executed_at: Optional[datetime] = None
     created_at: datetime
     candidate_waitlist: Optional[WaitlistResponse] = None
+    appointment: Optional[AppointmentInRecoveryResponse] = None
     class Config:
         from_attributes = True
 

@@ -8,91 +8,76 @@ export default {
   theme: {
     extend: {
       colors: {
-        apple: {
-          canvas: {
-            light: '#f5f5f7',
-            dark: '#000000',
-          },
-          subtle: {
-            light: '#fbfbfd',
-            dark: '#0a0a0c',
-          },
-          card: {
-            light: '#ffffff',
-            dark: '#141416',
-          },
-          elevated: {
-            light: '#ffffff',
-            dark: '#1c1c1e',
-          },
-          fill: {
-            light: '#efeff2',
-            dark: '#2c2c2e',
-          },
-          border: {
-            light: 'rgba(0, 0, 0, 0.08)',
-            dark: 'rgba(255, 255, 255, 0.09)',
-          },
-          text: {
-            primary: {
-              light: '#1d1d1f',
-              dark: '#f5f5f7',
-            },
-            secondary: {
-              light: '#86868b',
-              dark: '#a1a1a6',
-            },
-            tertiary: {
-              light: '#a1a1a6',
-              dark: '#6e6e73',
-            },
-          },
-          blue: {
-            light: '#0071e3',
-            dark: '#2997ff',
-            DEFAULT: '#0071e3',
-          },
-          indigo: {
-            DEFAULT: '#5e5ce6',
-            glow: 'rgba(94, 92, 230, 0.25)',
-          },
-          teal: '#00c7be',
-          green: '#30d158',
-          orange: '#ff9f0a',
-          red: '#ff453a',
-          pink: '#ff375f',
-          purple: '#bf5af2',
+        // SlotSure Spatial Physical Material Palette
+        porcelain: {
+          50: '#FAF9F6',
+          100: '#F4F3EF', // Main Warm Porcelain
+          200: '#ECEAE4',
+          300: '#E0DDD4',
+          DEFAULT: '#F4F3EF',
         },
-        background: {
-          light: '#fbfbfd',
-          dark: '#000000',
+        stone: {
+          50: '#F5F4F0',
+          100: '#E8E6DF', // Soft Stone
+          200: '#D9D6CC',
+          300: '#C7C3B6',
+          400: '#A49F90',
+          800: '#1C1D1A', // Dark Stone
+          900: '#141513', // Deep Dark Stone Canvas
+          DEFAULT: '#E8E6DF',
         },
-        surface: {
-          light: '#ffffff',
-          dark: '#121214',
-        },
-        subtle: {
-          light: '#f5f5f7',
-          dark: '#18181b',
-        },
-        border: {
-          light: '#e5e5ea',
-          dark: '#232326',
-        },
-        brand: {
-          50: '#eef2ff',
-          100: '#e0e7ff',
-          500: '#6366f1',
-          600: '#4f46e5',
-          700: '#4338ca',
+        graphite: {
+          800: '#2A2B28',
+          900: '#20211F', // Primary Graphite
+          DEFAULT: '#20211F',
         },
         charcoal: {
-          900: '#1d1d1f',
-          800: '#27272a',
-          700: '#3f3f46',
-          500: '#71717a',
-          400: '#a1a1aa',
-        }
+          700: '#484944',
+          800: '#30312E', // Secondary Charcoal
+          DEFAULT: '#30312E',
+        },
+        // Clinical Meaningful Semaphores
+        sage: {
+          100: '#E9EFEA',
+          200: '#C7D8CB',
+          500: '#718477', // Muted Sage - Confirmed/Healthy/Recovered
+          600: '#5A6E60',
+          DEFAULT: '#718477',
+        },
+        eucalyptus: {
+          500: '#40584B', // Deep Eucalyptus
+          600: '#34493D',
+          DEFAULT: '#40584B',
+        },
+        amber: {
+          100: '#F8F1E6',
+          200: '#EBD7BE',
+          500: '#B18A52', // Warm Amber - Attention / Medium Risk
+          600: '#94723F',
+          DEFAULT: '#B18A52',
+        },
+        coral: {
+          100: '#F7EBE8',
+          200: '#E8C5BE',
+          500: '#B96F63', // Muted Coral - High Risk / Intervene
+          600: '#9E5A50',
+          DEFAULT: '#B96F63',
+        },
+        steel: {
+          100: '#ECEEF0',
+          200: '#D0D5D9',
+          500: '#71808A', // Steel - Informational
+          600: '#596770',
+          DEFAULT: '#71808A',
+        },
+        // Apple / Legacy compatibility tokens
+        brand: {
+          50: '#F4F3EF',
+          100: '#E8E6DF',
+          500: '#718477',
+          600: '#40584B',
+          700: '#30312E',
+        },
       },
       fontFamily: {
         sans: [
@@ -103,28 +88,31 @@ export default {
           '"Plus Jakarta Sans"',
           'Inter',
           'system-ui',
-          'sans-serif'
+          'sans-serif',
+        ],
+        mono: [
+          '"SF Mono"',
+          'ui-monospace',
+          'Menlo',
+          'Monaco',
+          'Consolas',
+          'monospace',
         ],
       },
       borderRadius: {
-        'apple': '18px',
-        'apple-sm': '12px',
-        'apple-lg': '22px',
-        'apple-xl': '28px',
+        'spatial-xs': '8px',
+        'spatial-sm': '12px',
+        'spatial-md': '18px',
+        'spatial-lg': '24px',
+        'spatial-xl': '32px',
       },
       boxShadow: {
-        'soft': '0 2px 10px -2px rgba(0, 0, 0, 0.04), 0 1px 3px 0 rgba(0, 0, 0, 0.02)',
-        'apple-card': '0 2px 12px 0 rgba(0, 0, 0, 0.04), 0 1px 2px 0 rgba(0, 0, 0, 0.02), inset 0 1px 0 0 rgba(255, 255, 255, 0.8)',
-        'apple-card-dark': '0 4px 24px -2px rgba(0, 0, 0, 0.6), inset 0 1px 0 0 rgba(255, 255, 255, 0.08)',
-        'apple-hover': '0 12px 32px -8px rgba(0, 0, 0, 0.08), 0 4px 12px -2px rgba(0, 0, 0, 0.04)',
-        'apple-hover-dark': '0 16px 40px -10px rgba(0, 0, 0, 0.7), inset 0 1px 0 0 rgba(255, 255, 255, 0.12)',
-        'apple-glow': '0 0 30px -4px rgba(99, 102, 241, 0.25)',
-        'apple-glow-lg': '0 0 50px -5px rgba(99, 102, 241, 0.35)',
-        'dropdown': '0 20px 40px -15px rgba(0, 0, 0, 0.12), 0 0 1px 1px rgba(0, 0, 0, 0.04)',
+        'spatial-soft': '0 2px 8px -2px rgba(32, 33, 31, 0.04), 0 1px 3px 0 rgba(32, 33, 31, 0.02)',
+        'spatial-card': '0 4px 20px -2px rgba(32, 33, 31, 0.06), 0 1px 3px 0 rgba(32, 33, 31, 0.02), inset 0 1px 0 0 rgba(255, 255, 255, 0.7)',
+        'spatial-card-dark': '0 8px 32px -4px rgba(0, 0, 0, 0.5), inset 0 1px 0 0 rgba(255, 255, 255, 0.08)',
+        'spatial-elevated': '0 16px 48px -8px rgba(32, 33, 31, 0.1), 0 4px 12px -2px rgba(32, 33, 31, 0.04)',
+        'spatial-dock': '0 20px 50px -10px rgba(0, 0, 0, 0.15), 0 0 1px 1px rgba(255, 255, 255, 0.6)',
       },
-      transitionTimingFunction: {
-        'apple': 'cubic-bezier(0.16, 1, 0.3, 1)',
-      }
     },
   },
   plugins: [],

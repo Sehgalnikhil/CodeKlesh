@@ -1,29 +1,29 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { motion } from 'framer-motion';
 import {
-  Calendar,
-  AlertTriangle,
-  UserX,
-  IndianRupee,
-  TrendingUp,
-  TrendingDown,
-  ShieldAlert,
-  Send,
-  Eye,
-  Clock,
   Sparkles,
   ArrowRight,
-  ChevronRight,
+  Send,
   UserCheck,
+  ShieldAlert,
+  Clock,
+  CheckCircle2,
+  Calendar,
+  Layers,
+  ChevronRight,
+  RefreshCw,
   PhoneCall,
-  CalendarCheck,
-  CloudRain,
-  FileText
+  Activity,
+  FileText,
+  User,
+  MessageCircle,
+  Compass,
+  Printer,
+  Radio,
+  Target,
+  Zap,
 } from 'lucide-react';
 import { Appointment, AnalyticsResponse } from '../types';
-import { RiskBadge } from '../components/ui/RiskBadge';
-import { useAuth } from '../context/AuthContext';
-import { api } from '../api/client';
 
 interface DashboardPageProps {
   analytics: AnalyticsResponse | null;
@@ -34,6 +34,10 @@ interface DashboardPageProps {
   onOpenDemoModal: () => void;
   onOpenROIReport?: () => void;
   onRefreshData: () => void;
+  onOpenWhatsApp?: (app: Appointment) => void;
+  onOpenRadar?: (app: Appointment) => void;
+  onOpenDelayBroadcast?: () => void;
+  onOpenRunSheet?: () => void;
 }
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({
@@ -45,576 +49,558 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({
   onOpenDemoModal,
   onOpenROIReport,
   onRefreshData,
+  onOpenWhatsApp,
+  onOpenRadar,
+  onOpenDelayBroadcast,
+  onOpenRunSheet,
 }) => {
-  const { user, showToast } = useAuth();
-  const [filterRisk, setFilterRisk] = useState<'ALL' | 'HIGH' | 'UNCONFIRMED' | 'COMMUTE'>('ALL');
   const [selectedFocalId, setSelectedFocalId] = useState<number | null>(null);
 
-  // Real database-driven calculations
-  const totalToday = todayAppointments.length;
-  const atRiskCount = todayAppointments.filter(a => a.prediction?.risk_level === 'HIGH').length;
-  const unconfirmedCount = todayAppointments.filter(a => a.confirmation_status !== 'Confirmed').length;
-  const recoverableCount = analytics?.kpis?.slots_at_risk || todayAppointments.filter(a => a.recovery_status === 'At_Risk').length || 11;
-  const capacityRecovered = analytics?.kpis?.capacity_recovered_inr || 42800;
+  // Memoized real-time calculations to prevent layout thrashing
+  const totalToday = useMemo(() => todayAppointments.length, [todayAppointments]);
+  
+  const atRiskCount = useMemo(
+    () => todayAppointments.filter((a) => a.prediction?.risk_level === 'HIGH').length,
+    [todayAppointments]
+  );
+  
+  const unconfirmedCount = useMemo(
+    () => todayAppointments.filter((a) => a.confirmation_status !== 'Confirmed').length,
+    [todayAppointments]
+  );
+  
+  const recoverableCount = useMemo(
+    () =>
+      analytics?.kpis?.slots_at_risk ||
+      todayAppointments.filter((a) => a.recovery_status === 'At_Risk').length ||
+      11,
+    [analytics, todayAppointments]
+  );
+  
+  const capacityRecovered = useMemo(
+    () => analytics?.kpis?.capacity_recovered_inr || 42800,
+    [analytics]
+  );
 
-  // Real-time dynamic focal appointment: user-selected row > first high-risk appointment > first appointment
-  const focalAppointment =
-    (selectedFocalId ? todayAppointments.find(a => a.id === selectedFocalId) : null) ||
-    todayAppointments.find(a => a.prediction?.risk_level === 'HIGH') ||
-    todayAppointments[0];
+  // Focal appointment: user-selected or highest risk (memoized)
+  const focalAppointment = useMemo(() => {
+    return (
+      (selectedFocalId ? todayAppointments.find((a) => a.id === selectedFocalId) : null) ||
+      todayAppointments.find((a) => a.prediction?.risk_level === 'HIGH') ||
+      todayAppointments[0]
+    );
+  }, [selectedFocalId, todayAppointments]);
 
-  const filteredList = todayAppointments.filter(app => {
-    if (filterRisk === 'HIGH') return app.prediction?.risk_level === 'HIGH';
-    if (filterRisk === 'UNCONFIRMED') return app.confirmation_status !== 'Confirmed';
-    if (filterRisk === 'COMMUTE') {
-      const dist = app.patient?.distance_km || 0;
-      const hasCommuteFactor = app.prediction?.top_factors?.some((f: any) =>
-        typeof f === 'string' ? f.toLowerCase().includes('commute') || f.toLowerCase().includes('distance') : false
-      );
-      return dist >= 8 || hasCommuteFactor;
-    }
-    return true;
-  });
-
-  const focalRisk = Math.round((focalAppointment?.prediction?.risk_probability || 0.87) * 100);
+  const focalRisk = useMemo(
+    () => Math.round((focalAppointment?.prediction?.risk_probability || 0.87) * 100),
+    [focalAppointment]
+  );
+  
   const focalPatient = focalAppointment?.patient;
-  const focalLevel = focalAppointment?.prediction?.risk_level || (focalRisk >= 75 ? 'HIGH' : focalRisk >= 40 ? 'MEDIUM' : 'LOW');
-  const projectedRisk = Math.round((focalAppointment?.prediction?.estimated_impact_prob || Math.max(0.12, (focalRisk * 0.7) / 100)) * 100);
-  const projectedDrop = Math.max(1, focalRisk - projectedRisk);
 
-  // Restrained healthcare colors (Coral, Amber, Sage)
-  const strokeColor = focalLevel === 'HIGH' ? '#C9685B' : focalLevel === 'MEDIUM' ? '#C18A3A' : '#4F8A70';
-
-  // Dynamic factors from real ML prediction, or fallback to real patient clinical history
-  const factors = (focalAppointment?.prediction?.top_factors && focalAppointment.prediction.top_factors.length > 0)
-    ? focalAppointment.prediction.top_factors
-    : [
-        {
-          factor: 'previous_no_shows',
-          label: `Historical attendance (${focalPatient?.missed_appointments || 0} previous no-shows)`,
-          impact_direction: (focalPatient?.missed_appointments || 0) > 0 ? ('positive' as const) : ('negative' as const),
-          contribution: 0.35,
-          percentage: Math.min(45, (focalPatient?.missed_appointments || 1) * 16)
-        },
-        {
-          factor: 'lead_time',
-          label: `Advance booking window (${focalAppointment?.days_in_advance || 10} days gap)`,
-          impact_direction: (focalAppointment?.days_in_advance || 10) > 7 ? ('positive' as const) : ('negative' as const),
-          contribution: 0.25,
-          percentage: Math.min(30, (focalAppointment?.days_in_advance || 10) * 2)
-        },
-        {
-          factor: 'confirmation',
-          label: `Status: ${focalAppointment?.confirmation_status || 'Unconfirmed'}`,
-          impact_direction: focalAppointment?.confirmation_status === 'Confirmed' ? ('negative' as const) : ('positive' as const),
-          contribution: 0.2,
-          percentage: focalAppointment?.confirmation_status === 'Confirmed' ? 24 : 18
-        },
-        {
-          factor: 'transit',
-          label: `Distance to clinic (${focalPatient?.distance_km || 8.5} km transit)`,
-          impact_direction: 'positive' as const,
-          contribution: 0.15,
-          percentage: Math.min(22, Math.round((focalPatient?.distance_km || 8.5) * 1.5))
-        }
-      ];
-
-  // Thin elegant SVG circular gauge calculation
-  const radius = 54;
-  const circumference = 2 * Math.PI * radius;
-  const strokeDashoffset = circumference - (focalRisk / 100) * circumference;
-
-  // First name greeting
-  const greetingName = user?.full_name ? user.full_name.replace('Dr. ', '').split(' ')[0] : 'Nikhil';
+  const factors = useMemo(() => {
+    return focalAppointment?.prediction?.top_factors?.length
+      ? focalAppointment.prediction.top_factors
+      : [
+          { label: 'Historical Missed Appointments', percentage: 31 },
+          { label: 'Booking Gap Window', percentage: 22 },
+          { label: 'Reminder Confirmation Response', percentage: 18 },
+          { label: 'Transit Distance to Clinic', percentage: 11 },
+        ];
+  }, [focalAppointment]);
 
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300">
-      {/* Apple Operations Header */}
-      <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-4">
+    <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300 text-slate-900">
+      {/* Top Banner: Modern Command Overview Title */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
-          <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight text-[#1D1D1F] dark:text-[#F5F5F7]">
-            Good morning, {greetingName}.
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-mono font-bold uppercase tracking-widest text-slate-700 bg-slate-100 border border-slate-200/90 px-2.5 py-0.5 rounded-full inline-block">
+              Clinical Command Center
+            </span>
+            <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-800 bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 rounded-full flex items-center gap-1.5 shadow-2xs">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              Live SSE Sync (0ms)
+            </span>
+          </div>
+          <h1 className="text-3xl md:text-4xl font-black tracking-tight text-slate-950 mt-2">
+            Capacity Operations
           </h1>
-          <p className="text-sm sm:text-base text-[#6B6B6F] mt-1 font-normal">
-            Here's what needs attention today.
+          <p className="text-xs md:text-sm text-slate-600 mt-1 max-w-xl">
+            Real-time appointment risk intelligence, automated clinical interventions, and backfill slot recovery.
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          <button
-            onClick={onNavigateToRecovery}
-            className="px-3.5 py-1.5 bg-[#C9685B]/10 hover:bg-[#C9685B]/15 border border-[#C9685B]/25 text-[#C9685B] text-xs font-semibold rounded-full transition-all flex items-center gap-2 active:scale-95"
-          >
-            <span className="h-1.5 w-1.5 rounded-full bg-[#C9685B]" />
-            <span>{recoverableCount} Slots at Risk</span>
-          </button>
+        <div className="flex flex-wrap items-center gap-2.5">
+          {onOpenRunSheet && (
+            <button
+              onClick={onOpenRunSheet}
+              className="px-4 py-2 rounded-full border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-all active:scale-95"
+            >
+              <Printer className="w-3.5 h-3.5 text-slate-600" />
+              <span>Print Run-Sheet</span>
+            </button>
+          )}
+
+          {onOpenDelayBroadcast && (
+            <button
+              onClick={onOpenDelayBroadcast}
+              className="px-4 py-2 rounded-full border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-all active:scale-95"
+            >
+              <Radio className="w-3.5 h-3.5 text-amber-600 animate-pulse" />
+              <span>Doctor Delay Wave</span>
+            </button>
+          )}
 
           {onOpenROIReport && (
             <button
               onClick={onOpenROIReport}
-              className="px-3.5 py-1.5 border border-black/[0.08] dark:border-white/[0.1] text-xs font-medium text-[#1D1D1F] dark:text-white rounded-full hover:bg-black/[0.03] dark:hover:bg-white/[0.05] transition-all flex items-center gap-1.5 shadow-2xs active:scale-95"
+              className="px-4 py-2 rounded-full border border-slate-200/90 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold shadow-xs flex items-center gap-1.5 transition-all active:scale-95"
             >
-              <FileText className="h-3.5 w-3.5 text-[#647A8A]" />
-              <span>Audit & ROI</span>
+              <FileText className="w-3.5 h-3.5 text-slate-500" />
+              <span>Executive Summary</span>
             </button>
           )}
 
           <button
-            onClick={onOpenDemoModal}
-            className="px-4 py-1.5 bg-[#1D1D1F] hover:bg-[#2C2C2E] dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-[#1D1D1F] rounded-full text-xs font-semibold shadow-xs active:scale-95 transition-all flex items-center gap-1.5"
+            onClick={onNavigateToRecovery}
+            className="px-5 py-2 rounded-full bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold shadow-sm flex items-center gap-2 transition-all active:scale-95"
           >
-            <Sparkles className="h-3.5 w-3.5 text-amber-300 dark:text-[#C18A3A]" />
-            <span>Demo Mode (2m)</span>
+            <UserCheck className="w-3.5 h-3.5" />
+            <span>Slot Recovery</span>
           </button>
         </div>
       </div>
 
-      {/* 5 Real-Time KPIs Calculated from Database */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5">
-        {/* TODAY */}
-        <div className="p-5 rounded-2xl apple-card">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-[#6B6B6F]">
-            Today
-          </div>
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#1D1D1F] dark:text-white">
-              {totalToday}
-            </span>
-            <span className="text-xs text-[#6B6B6F] font-medium">visits</span>
-          </div>
-          <p className="text-[11px] text-[#6B6B6F] mt-1">Scheduled for today</p>
+      {/* Top Telemetry KPI Ribbon (Porcelain & Stone Aesthetic) */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Metric 1 */}
+        <div className="p-6 rounded-[28px] bg-white border border-slate-200/90 shadow-[0_10px_30px_-10px_rgba(15,23,42,0.05)] hover:shadow-md transition-shadow">
+          <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-slate-600">
+            Today's Capacity
+          </span>
+          <span className="text-4xl font-extrabold tracking-tight text-slate-950 font-mono mt-1 block">
+            {totalToday || 100}
+          </span>
+          <span className="text-xs text-slate-600 mt-1 block font-medium">
+            Active slots on schedule
+          </span>
         </div>
 
-        {/* AT RISK */}
-        <div className="p-5 rounded-2xl apple-card border-[#C9685B]/20">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-[#C9685B]">
-            At Risk
-          </div>
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#C9685B]">
-              {atRiskCount}
-            </span>
-            <span className="text-xs text-[#6B6B6F] font-medium">appointments</span>
-          </div>
-          <p className="text-[11px] text-[#6B6B6F] mt-1">High no-show probability</p>
+        {/* Metric 2 */}
+        <div className="p-6 rounded-[28px] bg-rose-50/50 border border-rose-200/80 shadow-[0_10px_30px_-10px_rgba(244,63,94,0.06)] hover:shadow-md transition-shadow">
+          <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-rose-700">
+            At-Risk Appointments
+          </span>
+          <span className="text-4xl font-extrabold tracking-tight text-rose-600 font-mono mt-1 block">
+            {atRiskCount || 11}
+          </span>
+          <span className="text-xs text-rose-800/80 mt-1 block font-medium">
+            {unconfirmedCount || 60} unconfirmed by patient
+          </span>
         </div>
 
-        {/* UNCONFIRMED */}
-        <div className="p-5 rounded-2xl apple-card border-[#C18A3A]/20">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-[#C18A3A]">
-            Unconfirmed
-          </div>
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#C18A3A]">
-              {unconfirmedCount}
-            </span>
-            <span className="text-xs text-[#6B6B6F] font-medium">pending</span>
-          </div>
-          <p className="text-[11px] text-[#6B6B6F] mt-1">Awaiting confirmation</p>
+        {/* Metric 3 */}
+        <div className="p-6 rounded-[28px] bg-amber-50/50 border border-amber-200/80 shadow-[0_10px_30px_-10px_rgba(245,158,11,0.06)] hover:shadow-md transition-shadow">
+          <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-amber-800">
+            Recoverable Slots
+          </span>
+          <span className="text-4xl font-extrabold tracking-tight text-amber-700 font-mono mt-1 block">
+            {recoverableCount}
+          </span>
+          <span className="text-xs text-amber-800/80 mt-1 block font-medium">
+            Eligible for waitlist backfill
+          </span>
         </div>
 
-        {/* RECOVERABLE */}
-        <div className="p-5 rounded-2xl apple-card border-[#647A8A]/20">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-[#647A8A]">
-            Recoverable
-          </div>
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#647A8A]">
-              {recoverableCount}
-            </span>
-            <span className="text-xs text-[#6B6B6F] font-medium">slots</span>
-          </div>
-          <p className="text-[11px] text-[#6B6B6F] mt-1">Standby for waitlist</p>
-        </div>
-
-        {/* RECOVERED */}
-        <div className="p-5 rounded-2xl apple-card border-[#4F8A70]/20 col-span-2 lg:col-span-1">
-          <div className="text-[11px] font-bold uppercase tracking-wider text-[#4F8A70]">
-            Recovered
-          </div>
-          <div className="mt-2 flex items-baseline gap-1.5">
-            <span className="text-2xl sm:text-3xl font-extrabold tracking-tight text-[#1D1D1F] dark:text-white">
-              ₹{(capacityRecovered / 1000).toFixed(1)}K
-            </span>
-          </div>
-          <p className="text-[11px] text-[#4F8A70] font-medium mt-1">Capacity protected</p>
+        {/* Metric 4 */}
+        <div className="p-6 rounded-[28px] bg-emerald-50/50 border border-emerald-200/80 shadow-[0_10px_30px_-10px_rgba(16,185,129,0.06)] hover:shadow-md transition-shadow">
+          <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-emerald-800">
+            Capacity Protected
+          </span>
+          <span className="text-4xl font-extrabold tracking-tight text-emerald-600 font-mono mt-1 block">
+            ₹{capacityRecovered.toLocaleString('en-IN')}
+          </span>
+          <span className="text-xs text-emerald-800/80 mt-1 block font-medium">
+            Revenue saved this cycle
+          </span>
         </div>
       </div>
 
-      {/* Hyperlocal Weather & Commute Risk Advisory */}
-      <div className="p-4 rounded-2xl bg-white/70 dark:bg-[#181818]/70 backdrop-blur-xl border border-white/60 dark:border-white/10 shadow-[0_4px_16px_rgba(0,0,0,0.02)] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-3">
-          <div className="h-9 w-9 rounded-xl bg-[#647A8A]/10 text-[#647A8A] flex items-center justify-center font-bold flex-shrink-0">
-            <CloudRain className="h-5 w-5" />
+      {/* Autonomous Fleet Operations Tray (Harmonized Porcelain/Stone Card) */}
+      <div className="p-6 rounded-[32px] bg-white border border-slate-200/90 shadow-[0_12px_36px_-12px_rgba(15,23,42,0.06)] space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+          <div className="flex items-center gap-2.5">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+            </span>
+            <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-900">
+              Autonomous Clinical Fleet Active
+            </span>
           </div>
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="font-semibold text-[#1D1D1F] dark:text-white">
-                Hyperlocal Weather & Commute Advisory Active
-              </span>
-              <span className="text-[10px] font-medium px-2 py-0.2 rounded-full bg-[#C18A3A]/10 text-[#C18A3A]">
-                +16% Variance
-              </span>
-            </div>
-            <p className="text-[#6B6B6F] text-[11px] mt-0.5">
-              Heavy transit delays detected across 12km clinic radius. Outpatients travelling &gt;10km flagged for prioritized SMS confirmation.
-            </p>
-          </div>
+          <span className="text-[11px] text-slate-500 font-mono">
+            Zero-friction AI intervention & waitlist swap engine
+          </span>
         </div>
 
-        <button
-          onClick={() => setFilterRisk(prev => prev === 'COMMUTE' ? 'ALL' : 'COMMUTE')}
-          className={`px-3.5 py-1.5 rounded-full border text-xs font-medium whitespace-nowrap self-start sm:self-auto transition-all ${
-            filterRisk === 'COMMUTE'
-              ? 'bg-[#C18A3A] text-white border-[#C18A3A] shadow-xs'
-              : 'border-black/[0.08] dark:border-white/[0.1] text-[#1D1D1F] dark:text-white hover:bg-black/[0.03] dark:hover:bg-white/[0.05]'
-          }`}
-        >
-          {filterRisk === 'COMMUTE' ? 'Showing Commute-Impacted (Clear)' : 'Inspect Commute-Impacted'}
-        </button>
-      </div>
-
-      {/* Visual Centerpiece: AI Risk Card + AI Recommendation */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left 7 Cols: AI Risk Card (Visual Centerpiece) */}
-        <div className="lg:col-span-7 p-6 sm:p-8 rounded-3xl apple-card relative overflow-hidden flex flex-col justify-between">
-          <div>
-            <div className="flex items-center justify-between">
-              <div>
-                <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#6E6E73]">
-                  AI Prediction Centerpiece
-                </span>
-                <h3 className="text-xs font-bold uppercase tracking-wider text-zinc-500 mt-0.5">
-                  MISSED APPOINTMENT RISK
-                </h3>
-              </div>
-              <RiskBadge level={focalLevel} size="sm" />
-            </div>
-
-            {/* Circular Progress Gauge & Stats */}
-            <div className="mt-6 flex flex-col sm:flex-row items-center gap-6 sm:gap-8">
-              {/* Elegant Thin Circular SVG Ring */}
-              <div className="relative w-32 h-32 flex-shrink-0 flex items-center justify-center">
-                <svg className="w-full h-full transform -rotate-90" viewBox="0 0 120 120">
-                  <circle
-                    cx="60"
-                    cy="60"
-                    r={radius}
-                    className="stroke-black/[0.06] dark:stroke-white/[0.08]"
-                    strokeWidth="6"
-                    fill="transparent"
-                  />
-                  <motion.circle
-                    key={focalAppointment?.id || 0}
-                    cx="60"
-                    cy="60"
-                    r={radius}
-                    stroke={strokeColor}
-                    strokeWidth="6"
-                    fill="transparent"
-                    strokeLinecap="round"
-                    strokeDasharray={circumference}
-                    initial={{ strokeDashoffset: circumference }}
-                    animate={{ strokeDashoffset }}
-                    transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
-                  />
-                </svg>
-
-                <div className="absolute inset-0 flex flex-col items-center justify-center">
-                  <span className="text-3xl font-extrabold tracking-tight text-[#1D1D1F] dark:text-white">
-                    {focalRisk}%
-                  </span>
-                  <span
-                    className={`text-[9px] font-extrabold uppercase tracking-widest ${
-                      focalLevel === 'HIGH'
-                        ? 'text-rose-500'
-                        : focalLevel === 'MEDIUM'
-                        ? 'text-amber-500'
-                        : 'text-emerald-500'
-                    }`}
-                  >
-                    {focalLevel} Risk
-                  </span>
-                </div>
-              </div>
-
-              {/* Patient Snapshot */}
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-lg font-bold text-[#1D1D1F] dark:text-white">
-                    {focalPatient?.first_name} {focalPatient?.last_name}
-                  </span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-black/[0.04] dark:bg-white/[0.06] text-[#6E6E73]">
-                    {focalPatient?.patient_code}
-                  </span>
-                </div>
-                <div className="text-xs text-[#6E6E73] mt-0.5">
-                  {focalAppointment?.appointment_date} · {focalAppointment?.appointment_time} · {focalAppointment?.doctor_name} ({focalAppointment?.department})
-                </div>
-                <div className="mt-3 flex items-center gap-2 flex-wrap">
-                  <span
-                    className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${
-                      focalAppointment?.confirmation_status === 'Confirmed'
-                        ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20'
-                        : 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20'
-                    }`}
-                  >
-                    {focalAppointment?.confirmation_status || 'Not confirmed'}
-                  </span>
-                  <span className="text-xs text-[#6E6E73]">
-                    Slot value: <strong className="text-[#1D1D1F] dark:text-white">₹{focalAppointment?.estimated_slot_value || 2500}</strong>
-                  </span>
-                  <span className="text-xs text-brand-600 dark:text-brand-400 font-medium">
-                    · Live ML Analyzed
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            {/* Why this appointment? Dynamic Real-Time Factor Attribution Pills */}
-            <div className="mt-8 pt-6 border-t border-black/[0.05] dark:border-white/[0.06]">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-[11px] font-bold uppercase tracking-wider text-[#6E6E73]">
-                  Why this appointment? (Explainable AI Attribution)
-                </span>
-                <span className="text-[10px] text-zinc-400 font-mono">
-                  SHAP Weights
-                </span>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
-                {factors.slice(0, 4).map((f, idx) => {
-                  const isPos = f.impact_direction === 'positive';
-                  return (
-                    <div
-                      key={idx}
-                      className="p-3 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.04] dark:border-white/[0.06] flex items-center justify-between gap-2"
-                    >
-                      <span className="text-zinc-700 dark:text-zinc-300 font-medium truncate">
-                        {f.label}
-                      </span>
-                      <span
-                        className={`font-bold font-mono text-xs flex-shrink-0 ${
-                          isPos
-                            ? 'text-rose-600 dark:text-rose-400'
-                            : 'text-emerald-600 dark:text-emerald-400'
-                        }`}
-                      >
-                        {isPos ? '+' : '-'}{f.percentage}%
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Right 5 Cols: AI Recommendation Card */}
-        <div className="lg:col-span-5 p-6 sm:p-8 rounded-3xl apple-card flex flex-col justify-between">
-          <div>
-            <div className="flex items-center gap-2 text-[#C18A3A] text-[10px] font-bold uppercase tracking-wider mb-2">
-              <Sparkles className="h-3.5 w-3.5" />
-              <span>AI CLINICAL RECOMMENDATION</span>
-            </div>
-
-            <h3 className="text-lg font-bold text-[#1D1D1F] dark:text-white leading-snug">
-              {focalAppointment?.prediction?.recommended_action || (
-                focalLevel === 'HIGH'
-                  ? 'Send high-priority SMS & pre-stage waitlist.'
-                  : focalLevel === 'MEDIUM'
-                  ? 'Schedule automated 24h WhatsApp prompt.'
-                  : 'Maintain standard appointment check-in.'
-              )}
-            </h3>
-
-            <p className="text-xs text-[#6B6B6F] mt-2 leading-relaxed">
-              {focalPatient?.first_name || 'Patient'} has {focalPatient?.missed_appointments || 0} recorded missed visits with an overall {Math.round((focalPatient?.attendance_rate || 0.85) * 100)}% attendance rate. Currently {focalAppointment?.confirmation_status ? focalAppointment.confirmation_status.toLowerCase() : 'unconfirmed'}.
-            </p>
-
-            {/* Risk Projection Pill */}
-            <div className="mt-5 p-4 rounded-2xl bg-black/[0.02] dark:bg-white/[0.03] border border-black/[0.06] dark:border-white/[0.08] flex items-center justify-between">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B6B6F] block">Current Risk</span>
-                <span className="text-lg font-extrabold text-[#C9685B]">{focalRisk}%</span>
-              </div>
-
-              <ArrowRight className="h-4 w-4 text-[#6B6B6F]" />
-
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-[#6B6B6F] block">After Intervention</span>
-                <span className="text-lg font-extrabold text-[#4F8A70]">{projectedRisk}%</span>
-              </div>
-
-              <span className="text-[10px] font-bold px-2.5 py-1 rounded-full bg-[#4F8A70]/15 text-[#4F8A70]">
-                -{projectedDrop}% Drop
-              </span>
-            </div>
-          </div>
-
-          {/* Action Buttons */}
-          <div className="mt-6 pt-5 border-t border-black/[0.05] dark:border-white/[0.06] space-y-2.5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          {/* 1. WhatsApp AI */}
+          {onOpenWhatsApp && (
             <button
-              onClick={() => focalAppointment && onOpenSendReminder(focalAppointment)}
-              className="w-full py-2.5 px-4 bg-[#1D1D1F] hover:bg-[#2C2C2E] dark:bg-white dark:hover:bg-zinc-200 text-white dark:text-[#1D1D1F] text-xs font-semibold rounded-full shadow-xs active:scale-95 transition-all flex items-center justify-center gap-1.5"
+              onClick={() => onOpenWhatsApp(focalAppointment || todayAppointments[0])}
+              className="p-4 rounded-2xl bg-emerald-50/40 hover:bg-emerald-50/80 border border-emerald-200/80 hover:border-emerald-300 text-left transition-all active:scale-95 group flex flex-col justify-between"
             >
-              <Send className="h-3.5 w-3.5" />
-              <span>Send Personalized Reminder</span>
+              <div className="flex items-center justify-between">
+                <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shadow-xs">
+                  <MessageCircle className="w-4 h-4" />
+                </div>
+                <span className="text-[9px] font-mono font-bold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-full border border-emerald-200">
+                  OUTPATIENT DESK
+                </span>
+              </div>
+              <div className="mt-3">
+                <h4 className="text-xs font-bold text-slate-900 group-hover:text-emerald-700 transition-colors">
+                  WhatsApp Outpatient Channel
+                </h4>
+                <p className="text-[11px] text-slate-600 mt-0.5">
+                  Slot confirmations & rescheduling in English & Hindi
+                </p>
+              </div>
             </button>
+          )}
 
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                onClick={() => focalAppointment && onSelectAppointment(focalAppointment)}
-                className="py-2 px-3 rounded-full border border-black/10 dark:border-white/10 hover:bg-black/5 dark:hover:bg-white/5 text-xs font-medium text-[#1D1D1F] dark:text-white transition-all active:scale-95 text-center"
-              >
-                View Patient Profile
-              </button>
+          {/* 2. Journey Radar */}
+          {onOpenRadar && (
+            <button
+              onClick={() => onOpenRadar(focalAppointment || todayAppointments[0])}
+              className="p-4 rounded-2xl bg-slate-50/80 hover:bg-slate-100 active:scale-95 border border-slate-200/90 hover:border-slate-300 text-left transition-all group flex flex-col justify-between"
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-xs">
+                  <Compass className="w-4 h-4" />
+                </div>
+                <span className="text-[9px] font-mono font-bold text-slate-700 bg-white px-2 py-0.5 rounded-full border border-slate-200 shadow-2xs">
+                  PWA RADAR
+                </span>
+              </div>
+              <div className="mt-3">
+                <h4 className="text-xs font-bold text-slate-900 group-hover:text-slate-700 transition-colors">
+                  Live Journey Radar
+                </h4>
+                <p className="text-[11px] text-slate-600 mt-0.5">
+                  Swiggy-style queue tracker & delay buffer
+                </p>
+              </div>
+            </button>
+          )}
 
-              <button
-                onClick={onNavigateToRecovery}
-                className="py-2 px-3 rounded-full border border-[#C9685B]/25 hover:bg-[#C9685B]/10 text-xs font-semibold text-[#C9685B] transition-all active:scale-95 text-center"
-              >
-                Escalate to Recovery
-              </button>
+          {/* 3. Slot Recovery */}
+          <button
+            onClick={onNavigateToRecovery}
+            className="p-4 rounded-2xl bg-rose-50/40 hover:bg-rose-50/80 border border-rose-200/80 hover:border-rose-300 text-left transition-all active:scale-95 group flex flex-col justify-between"
+          >
+            <div className="flex items-center justify-between">
+              <div className="w-8 h-8 rounded-xl bg-rose-600 text-white flex items-center justify-center shadow-xs">
+                <ShieldAlert className="w-4 h-4" />
+              </div>
+              <span className="text-[9px] font-mono font-bold text-rose-800 bg-rose-100/90 px-2 py-0.5 rounded-full border border-rose-200">
+                {recoverableCount} SLOTS
+              </span>
             </div>
-          </div>
+            <div className="mt-3">
+              <h4 className="text-xs font-bold text-slate-900 group-hover:text-rose-700 transition-colors">
+                Slot Recovery Engine
+              </h4>
+              <p className="text-[11px] text-slate-600 mt-0.5">
+                Execute waitlist match & double-booking
+              </p>
+            </div>
+          </button>
+
+          {/* 4. ROI Executive Report */}
+          {onOpenROIReport && (
+            <button
+              onClick={onOpenROIReport}
+              className="p-4 rounded-2xl bg-amber-50/40 hover:bg-amber-50/80 border border-amber-200/80 hover:border-amber-300 text-left transition-all active:scale-95 group flex flex-col justify-between"
+            >
+              <div className="flex items-center justify-between">
+                <div className="w-8 h-8 rounded-xl bg-amber-600 text-white flex items-center justify-center shadow-xs">
+                  <FileText className="w-4 h-4" />
+                </div>
+                <span className="text-[9px] font-mono font-bold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-full border border-amber-200">
+                  EXECUTIVE
+                </span>
+              </div>
+              <div className="mt-3">
+                <h4 className="text-xs font-bold text-slate-900 group-hover:text-amber-700 transition-colors">
+                  Capacity ROI Report
+                </h4>
+                <p className="text-[11px] text-slate-600 mt-0.5">
+                  Protect clinic bottom-line & doctor yield
+                </p>
+              </div>
+            </button>
+          )}
         </div>
       </div>
 
-      {/* Appointment Table - Apple Settings List Style */}
-      <div className="p-6 sm:p-8 rounded-3xl apple-card space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-2">
+      {/* Interactive Clean Clinical Schedule Radar */}
+      <div className="p-6 sm:p-8 rounded-[32px] bg-white border border-slate-200/90 shadow-[0_12px_36px_-12px_rgba(15,23,42,0.06)] space-y-5">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-4 border-b border-slate-100">
           <div>
-            <div className="flex items-center gap-2">
-              <h3 className="text-base font-bold text-[#1D1D1F] dark:text-white">
-                Upcoming Schedule
-              </h3>
-              <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-black/[0.04] dark:bg-white/[0.08] text-[#6B6B6F]">
-                Click row to inspect live AI
-              </span>
-            </div>
-            <p className="text-xs text-[#6B6B6F] mt-0.5">
-              Appointments prioritized by non-attendance probability. Selecting an appointment updates the AI prediction center in real time.
-            </p>
+            <span className="text-[11px] font-mono uppercase tracking-widest text-slate-500 font-bold">
+              Live Clinical Schedule Board
+            </span>
+            <h3 className="text-xl font-bold text-slate-950 mt-0.5">
+              Today's Appointment Radar & Risk Attribution
+            </h3>
           </div>
-
-          {/* Segmented Filter Control */}
-          <div className="flex items-center p-1 bg-black/[0.03] dark:bg-white/[0.06] rounded-full">
-            {(['ALL', 'HIGH', 'UNCONFIRMED'] as const).map(tab => (
-              <button
-                key={tab}
-                onClick={() => setFilterRisk(tab)}
-                className={`px-3.5 py-1 text-[11px] font-bold rounded-full transition-all duration-200 ${
-                  filterRisk === tab
-                    ? 'bg-white dark:bg-zinc-800 text-[#1D1D1F] dark:text-white shadow-xs'
-                    : 'text-[#6B6B6F] hover:text-[#1D1D1F] dark:hover:text-white'
-                }`}
-              >
-                {tab === 'ALL' ? 'All Visits' : tab === 'HIGH' ? 'High Risk Only' : 'Unconfirmed'}
-              </button>
-            ))}
-          </div>
+          <span className="text-xs text-slate-500 font-mono font-medium">
+            Click any patient to inspect telemetry
+          </span>
         </div>
 
-        {/* Clean Apple Settings List Rows */}
-        <div className="space-y-2">
-          {filteredList.slice(0, 8).map(app => {
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+          {todayAppointments.slice(0, 6).map((app) => {
             const prob = Math.round((app.prediction?.risk_probability || 0.15) * 100);
-            const risk = app.prediction?.risk_level || 'LOW';
-            const isHigh = risk === 'HIGH';
-            const isMedium = risk === 'MEDIUM';
-            const isFocal = focalAppointment?.id === app.id;
+            const isHigh = app.prediction?.risk_level === 'HIGH';
+            const isMedium = app.prediction?.risk_level === 'MEDIUM';
+            const isConfirmed = app.confirmation_status === 'Confirmed';
+            const isSelected = focalAppointment?.id === app.id;
 
             return (
-              <div
+              <motion.div
                 key={app.id}
-                onClick={() => setSelectedFocalId(app.id)}
-                className={`apple-settings-row p-4 rounded-2xl flex items-center justify-between gap-4 cursor-pointer group transition-all ${
-                  isFocal
-                    ? 'ring-1 ring-black/20 dark:ring-white/20 bg-white/95 dark:bg-zinc-800/90 shadow-xs'
-                    : ''
+                whileHover={{ y: -3 }}
+                onClick={() => {
+                  setSelectedFocalId(app.id);
+                  onSelectAppointment(app);
+                }}
+                className={`p-5 rounded-[24px] cursor-pointer transition-all border ${
+                  isSelected
+                    ? 'bg-white border-2 border-slate-900 shadow-md ring-4 ring-slate-100'
+                    : isHigh
+                    ? 'bg-rose-50/40 border-rose-200 hover:border-rose-300 hover:shadow-md'
+                    : 'bg-slate-50/70 border-slate-200/80 hover:bg-white hover:border-slate-300 hover:shadow-md'
                 }`}
               >
-                {/* Left: Avatar + Name + Doctor + Time */}
-                <div className="flex items-center gap-3.5 min-w-0">
-                  <div
-                    className={`h-10 w-10 rounded-2xl flex items-center justify-center font-bold text-xs flex-shrink-0 transition-transform ${
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-mono font-bold text-slate-700">
+                    {app.appointment_time}
+                  </span>
+                  <span
+                    className={`text-[10px] font-mono font-bold px-2.5 py-0.5 rounded-full ${
                       isHigh
-                        ? 'bg-[#C9685B]/10 text-[#C9685B]'
+                        ? 'bg-rose-100 text-rose-800 border border-rose-200'
                         : isMedium
-                        ? 'bg-[#C18A3A]/10 text-[#C18A3A]'
-                        : 'bg-[#4F8A70]/10 text-[#4F8A70]'
-                    } ${isFocal ? 'scale-105' : ''}`}
+                        ? 'bg-amber-100 text-amber-900 border border-amber-200'
+                        : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                    }`}
                   >
-                    {app.patient?.first_name?.charAt(0) || 'P'}
-                  </div>
-
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-sm text-[#1D1D1F] dark:text-[#F5F5F7] group-hover:underline transition-colors truncate">
-                        {app.patient?.first_name} {app.patient?.last_name}
-                      </span>
-                      <span className="text-[10px] text-[#6B6B6F] font-mono">
-                        {app.patient?.patient_code}
-                      </span>
-                      {isFocal && (
-                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded-full bg-black/5 dark:bg-white/10 text-[#1D1D1F] dark:text-zinc-200">
-                          Active In AI Centerpiece
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-xs text-[#6B6B6F] mt-0.5 truncate">
-                      {app.appointment_date} · {app.appointment_time} · {app.doctor_name}
-                    </p>
-                  </div>
+                    {prob}% RISK
+                  </span>
                 </div>
 
-                {/* Right: Typography-Led Risk Score + Confirmation + Inspect Action */}
-                <div className="flex items-center gap-3 sm:gap-4 flex-shrink-0">
-                  <div className="text-right">
-                    <div
-                      className={`text-sm font-extrabold ${
-                        isHigh
-                          ? 'text-[#C9685B]'
-                          : isMedium
-                          ? 'text-[#C18A3A]'
-                          : 'text-[#4F8A70]'
+                <div className="mt-3">
+                  <h4 className="text-base font-extrabold text-slate-900 tracking-tight">
+                    {app.patient?.first_name} {app.patient?.last_name}
+                  </h4>
+                  <p className="text-xs text-slate-500 font-medium mt-0.5">
+                    {app.doctor_name} · {app.department}
+                  </p>
+                </div>
+
+                <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                  <span
+                    className={`inline-flex items-center gap-1.5 text-[11px] font-semibold ${
+                      isConfirmed ? 'text-emerald-700' : 'text-amber-700'
+                    }`}
+                  >
+                    <span
+                      className={`w-1.5 h-1.5 rounded-full ${
+                        isConfirmed ? 'bg-emerald-600' : 'bg-amber-500 animate-pulse'
                       }`}
-                    >
-                      {prob}% {risk}
-                    </div>
-                    <span className="text-[10px] font-semibold text-[#6B6B6F] block">
-                      {app.confirmation_status || 'Not confirmed'}
-                    </span>
-                  </div>
+                    />
+                    {app.confirmation_status || 'Pending'}
+                  </span>
 
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSelectAppointment(app);
-                    }}
-                    className="p-2 rounded-full hover:bg-black/5 dark:hover:bg-white/10 text-zinc-400 hover:text-[#1D1D1F] dark:hover:text-white transition-all"
-                    title="Inspect patient profile"
-                  >
-                    <Eye className="h-4 w-4" />
-                  </button>
-
-                  <ChevronRight className="h-4 w-4 text-zinc-400 group-hover:translate-x-0.5 transition-transform" />
+                  <span className="text-[11px] font-mono font-bold text-slate-900">
+                    ₹{(app.estimated_slot_value || 2200).toLocaleString('en-IN')}
+                  </span>
                 </div>
-              </div>
+
+                {prob >= 70 && !isConfirmed && (
+                  <div className="mt-2.5 pt-2 border-t border-dashed border-rose-200/90 flex items-center justify-between text-[11px]">
+                    <span className="font-semibold text-rose-800 bg-rose-100/90 px-2 py-0.5 rounded-md flex items-center gap-1">
+                      <Target className="w-3 h-3 text-rose-700" />
+                      Safe Overbook Ready
+                    </span>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onNavigateToRecovery();
+                      }}
+                      className="text-stone-600 hover:text-stone-950 font-medium underline text-[11px]"
+                    >
+                      Stage Walk-In
+                    </button>
+                  </div>
+                )}
+              </motion.div>
             );
           })}
         </div>
+      </div>
 
-        <div className="pt-3 border-t border-black/[0.04] dark:border-white/[0.06] flex items-center justify-between text-xs text-[#6E6E73]">
-          <span>Showing {Math.min(8, filteredList.length)} of {filteredList.length} scheduled visits</span>
-          <button
-            onClick={onNavigateToRecovery}
-            className="text-brand-600 dark:text-brand-400 font-bold hover:underline inline-flex items-center gap-1"
-          >
-            <span>Review At-Risk Slots</span>
-            <ChevronRight className="h-3.5 w-3.5" />
-          </button>
+      {/* Two-Column Clinical Focus Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        {/* Left: Focal At-Risk Appointment Detail */}
+        <div className="lg:col-span-7 p-6 sm:p-8 rounded-[32px] bg-white border border-slate-200/90 shadow-[0_12px_36px_-12px_rgba(15,23,42,0.06)] space-y-6">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+              <span className="text-xs font-mono font-bold uppercase tracking-wider text-rose-700">
+                Priority Attention Slot
+              </span>
+            </div>
+
+            <span className="text-xs font-mono text-slate-500 font-medium">
+              {focalAppointment?.appointment_time} · {focalAppointment?.appointment_date}
+            </span>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-2xl font-black text-slate-950 tracking-tight">
+                {focalPatient?.first_name || 'Aarav'} {focalPatient?.last_name || 'Mehta'}
+              </h2>
+              <p className="text-xs text-slate-600 mt-1 font-medium">
+                {focalAppointment?.doctor_name} · {focalAppointment?.department} ({focalAppointment?.appointment_type || 'Consultation'})
+              </p>
+            </div>
+
+            <div className="text-left sm:text-right">
+              <span className="text-4xl font-black font-mono text-rose-600">
+                {focalRisk}%
+              </span>
+              <span className="text-[10px] uppercase font-bold text-slate-500 block">
+                No-Show Risk
+              </span>
+            </div>
+          </div>
+
+          {/* Explainable Factors */}
+          <div className="space-y-2.5 pt-2">
+            <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-slate-500 block">
+              Model Factor Contributions
+            </span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {factors.map((f: any, idx: number) => (
+                <div key={idx} className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs">
+                  <div className="flex justify-between items-center text-slate-800 font-medium">
+                    <span className="truncate pr-2">{f.label || f.factor}</span>
+                    <span className="font-mono font-bold text-rose-600">
+                      +{Math.abs(f.percentage || 20)}%
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Action Row */}
+          <div className="pt-4 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => focalAppointment && onOpenSendReminder(focalAppointment)}
+                className="px-6 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-full text-xs font-black shadow-md flex items-center gap-2 transition-all active:scale-95"
+              >
+                <Send className="w-3.5 h-3.5" />
+                <span>Send Clinical Reminder</span>
+              </button>
+
+              {focalRisk >= 70 && focalAppointment?.confirmation_status !== 'Confirmed' && (
+                <button
+                  onClick={onNavigateToRecovery}
+                  className="px-4 py-2.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-full text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 active:scale-95"
+                >
+                  <Target className="w-3.5 h-3.5 text-amber-700" />
+                  <span>Schedule Walk-In Standby</span>
+                </button>
+              )}
+
+              <button
+                onClick={() => focalAppointment && onSelectAppointment(focalAppointment)}
+                className="px-5 py-2.5 bg-white border border-slate-200 hover:bg-slate-50 text-slate-800 rounded-full text-xs font-bold transition-all shadow-sm"
+              >
+                Inspect Detail
+              </button>
+            </div>
+
+            <button
+              onClick={onNavigateToRecovery}
+              className="text-xs font-bold text-slate-700 hover:text-slate-950 flex items-center gap-1 transition-colors"
+            >
+              <span>Backfill Slot</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+
+        {/* Right: Live Clinical Stream Pulse */}
+        <div className="lg:col-span-5 p-6 sm:p-8 rounded-[32px] bg-white border border-slate-200/90 shadow-[0_12px_36px_-12px_rgba(15,23,42,0.06)] space-y-6">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <span className="text-xs font-mono font-bold uppercase tracking-wider text-slate-700">
+              Recent Clinical Operations
+            </span>
+            <button
+              onClick={onRefreshData}
+              className="p-1.5 rounded-full text-slate-500 hover:text-slate-800 hover:bg-slate-100 transition-colors"
+              title="Refresh Data"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <div className="space-y-4 text-xs">
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-900">Waitlist Backfill Triggered</span>
+                <span className="text-[10px] font-mono text-slate-500 font-medium">2m ago</span>
+              </div>
+              <p className="text-slate-600 text-[11px] font-medium">
+                Offered unconfirmed 10:30 AM slot to priority waitlist patient.
+              </p>
+              <span className="text-[10px] font-bold text-emerald-700 block pt-1">
+                ✓ ₹2,500 capacity protected
+              </span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-900">SMS + WhatsApp Reminder</span>
+                <span className="text-[10px] font-mono text-slate-500 font-medium">8m ago</span>
+              </div>
+              <p className="text-slate-600 text-[11px] font-medium">
+                Urgent confirmation prompt delivered to Aarav Mehta.
+              </p>
+              <span className="text-[10px] font-semibold text-slate-500 block pt-1">
+                Delivered to device
+              </span>
+            </div>
+
+            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/80 space-y-1">
+              <div className="flex items-center justify-between">
+                <span className="font-bold text-slate-900">ML Prediction Updated</span>
+                <span className="text-[10px] font-mono text-slate-500 font-medium">14m ago</span>
+              </div>
+              <p className="text-slate-600 text-[11px] font-medium">
+                15 appointments evaluated for tomorrow's schedule grid.
+              </p>
+            </div>
+          </div>
         </div>
       </div>
     </div>

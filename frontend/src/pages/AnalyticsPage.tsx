@@ -10,7 +10,7 @@ import {
   XAxis,
   YAxis,
   Tooltip,
-  ResponsiveContainer
+  ResponsiveContainer,
 } from 'recharts';
 import {
   TrendingUp,
@@ -21,7 +21,7 @@ import {
   Clock,
   Sparkles,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
 } from 'lucide-react';
 import { AnalyticsResponse } from '../types';
 
@@ -67,124 +67,131 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ analytics }) => {
   };
 
   const donutData = [
-    { name: 'Low Risk', value: analytics?.risk_distribution.low || 64, color: '#4F8A70' },
-    { name: 'Medium Risk', value: analytics?.risk_distribution.medium || 38, color: '#C18A3A' },
-    { name: 'High Risk', value: analytics?.risk_distribution.high || 26, color: '#C9685B' },
+    { name: 'Low Risk', value: analytics?.risk_distribution.low || 64, color: '#718477' },
+    { name: 'Medium Risk', value: analytics?.risk_distribution.medium || 38, color: '#B18A52' },
+    { name: 'High Risk', value: analytics?.risk_distribution.high || 26, color: '#B96F63' },
   ];
 
+  const capacitySaved = analytics?.kpis?.capacity_recovered_inr || 42800;
+
   return (
-    <div className="p-6 md:p-8 max-w-7xl mx-auto space-y-8 animate-in fade-in duration-300">
+    <div className="p-6 md:p-10 max-w-7xl mx-auto space-y-10 animate-in fade-in duration-300">
       {/* Title */}
       <div>
-        <span className="text-[11px] font-bold uppercase tracking-wider text-[#6B6B6F]">
-          Operational Trends
+        <span className="text-[11px] font-mono font-bold uppercase tracking-widest text-steel-500">
+          Capacity Telemetry Observatory
         </span>
-        <h1 className="text-3xl font-semibold tracking-tight text-[#1D1D1F] dark:text-white mt-1">
-          Analytics & Performance
+        <h1 className="text-3xl md:text-5xl font-extrabold tracking-tight text-graphite-900 mt-1">
+          Analytics Observatory
         </h1>
-        <p className="text-sm text-[#6B6B6F] mt-1">
-          Comprehensive real-time metrics on attendance patterns, specialty variance, and clinical capacity.
+        <p className="text-xs md:text-sm text-charcoal-700 mt-1 max-w-xl">
+          Clean clinical signals, trend lines, and attribution metrics for patient attendance patterns.
         </p>
       </div>
 
-      {/* Model Performance Metrics */}
-      <div className="p-6 rounded-2xl bg-white/70 dark:bg-[#181818]/70 backdrop-blur-xl border border-white/60 dark:border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.03)] space-y-4">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-black/[0.04] dark:border-white/[0.06]">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold uppercase tracking-wider text-[#6B6B6F]">
-              Supervised Clinical Risk Model Benchmark
-            </span>
-          </div>
-          <span className="text-[10px] font-medium text-[#4F8A70] bg-[#4F8A70]/10 px-2.5 py-0.5 rounded-full border border-[#4F8A70]/20">
-            Validated Cross-Cohort
+      {/* Large Swiss Observatory Numbers */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="p-6 rounded-3xl bg-stone-100 border border-stone-200 shadow-spatial-soft">
+          <span className="text-[10px] font-mono uppercase tracking-wider text-steel-500 block">
+            Appointments Monitored
+          </span>
+          <span className="text-4xl font-extrabold tracking-tight text-graphite-900 font-mono mt-1 block">
+            {analytics?.business_impact?.appointments_analyzed || 1284}
+          </span>
+          <span className="text-[11px] text-eucalyptus-600 mt-1 block">
+            +8.4% volume this week
           </span>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-          <div className="p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] text-center">
-            <span className="text-[10px] text-[#6B6B6F] font-semibold uppercase tracking-wider">Accuracy</span>
-            <div className="text-2xl font-semibold text-[#1D1D1F] dark:text-white mt-1">
-              {Math.round(metrics.accuracy * 100)}%
-            </div>
-          </div>
+        <div className="p-6 rounded-3xl bg-stone-100 border border-stone-200 shadow-spatial-soft">
+          <span className="text-[10px] font-mono uppercase tracking-wider text-coral-500 font-bold block">
+            High Risk Rate
+          </span>
+          <span className="text-4xl font-extrabold tracking-tight text-coral-500 font-mono mt-1 block">
+            {Math.round(
+              ((analytics?.kpis?.high_risk_appointments || 15) /
+                Math.max(1, analytics?.kpis?.today_appointments || 30)) *
+                100
+            )}
+            %
+          </span>
+          <span className="text-[11px] text-steel-500 mt-1 block">
+            Flagged for intervention
+          </span>
+        </div>
 
-          <div className="p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] text-center">
-            <span className="text-[10px] text-[#6B6B6F] font-semibold uppercase tracking-wider">Precision</span>
-            <div className="text-2xl font-semibold text-[#1D1D1F] dark:text-white mt-1">
-              {Math.round(metrics.precision * 100)}%
-            </div>
-          </div>
+        <div className="p-6 rounded-3xl bg-stone-100 border border-stone-200 shadow-spatial-soft">
+          <span className="text-[10px] font-mono uppercase tracking-wider text-amber-500 font-bold block">
+            Recovered Slots
+          </span>
+          <span className="text-4xl font-extrabold tracking-tight text-amber-500 font-mono mt-1 block">
+            {analytics?.business_impact?.slots_recovered || 11}
+          </span>
+          <span className="text-[11px] text-steel-500 mt-1 block">
+            Backfilled from waitlist
+          </span>
+        </div>
 
-          <div className="p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] text-center">
-            <span className="text-[10px] text-[#6B6B6F] font-semibold uppercase tracking-wider">Recall</span>
-            <div className="text-2xl font-semibold text-[#1D1D1F] dark:text-white mt-1">
-              {Math.round(metrics.recall * 100)}%
-            </div>
-          </div>
-
-          <div className="p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] text-center">
-            <span className="text-[10px] text-[#6B6B6F] font-semibold uppercase tracking-wider">F1 Score</span>
-            <div className="text-2xl font-semibold text-[#1D1D1F] dark:text-white mt-1">
-              {metrics.f1_score.toFixed(2)}
-            </div>
-          </div>
-
-          <div className="p-3.5 rounded-xl bg-black/[0.02] dark:bg-white/[0.03] text-center">
-            <span className="text-[10px] text-[#6B6B6F] font-semibold uppercase tracking-wider">ROC-AUC</span>
-            <div className="text-2xl font-semibold text-[#647A8A] mt-1">
-              {metrics.roc_auc.toFixed(3)}
-            </div>
-          </div>
+        <div className="p-6 rounded-3xl bg-stone-100 border border-stone-200 shadow-spatial-soft">
+          <span className="text-[10px] font-mono uppercase tracking-wider text-eucalyptus-500 font-bold block">
+            Capacity Protected
+          </span>
+          <span className="text-4xl font-extrabold tracking-tight text-eucalyptus-500 font-mono mt-1 block">
+            ₹{capacitySaved.toLocaleString('en-IN')}
+          </span>
+          <span className="text-[11px] text-eucalyptus-600 mt-1 block">
+            +₹6,400 protected today
+          </span>
         </div>
       </div>
 
-      {/* Row 1: Apple Health Minimal Area Chart + Risk Donut */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Apple Health Minimal Smooth Trend */}
-        <div className="lg:col-span-8 p-6 rounded-2xl bg-white/70 dark:bg-[#181818]/70 backdrop-blur-xl border border-white/60 dark:border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.03)] space-y-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between pb-3 border-b border-black/[0.04] dark:border-white/[0.06]">
+      {/* Main Observatory Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        {/* Left: Trend Line Chart */}
+        <div className="lg:col-span-8 p-8 rounded-3xl bg-stone-100 border border-stone-200 shadow-spatial-card space-y-4">
+          <div className="flex items-center justify-between border-b border-stone-200/80 pb-4">
             <div>
-              <h3 className="text-sm font-semibold text-[#1D1D1F] dark:text-white">
-                No-Show Rate Over Time
+              <span className="text-[10px] font-mono uppercase text-steel-500">
+                Primary Trajectory
+              </span>
+              <h3 className="text-base font-bold text-graphite-900 mt-0.5">
+                No-Show Rate Over Time (Post-Intervention)
               </h3>
-              <p className="text-xs text-[#6B6B6F] mt-0.5">14-day rolling outpatient attendance trend</p>
             </div>
-            <div className="flex items-center gap-1 text-xs text-[#4F8A70] font-medium">
-              <TrendingDown className="h-3.5 w-3.5" />
-              <span>-5.2% after reminder protocol</span>
-            </div>
+            <span className="px-3 py-1 rounded-full bg-sage-100 text-eucalyptus-600 text-xs font-semibold">
+              ↓ 12.5% reduction
+            </span>
           </div>
 
-          {/* Smooth Area Chart in Muted Blue-Gray */}
-          <div className="h-64 mt-2">
+          <div className="h-72 w-full pt-4">
             <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={timeSeries} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
+              <AreaChart data={timeSeries} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                 <defs>
-                  <linearGradient id="healthGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#647A8A" stopOpacity={0.25} />
-                    <stop offset="95%" stopColor="#647A8A" stopOpacity={0.0} />
+                  <linearGradient id="colorNoShow" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#718477" stopOpacity={0.25} />
+                    <stop offset="95%" stopColor="#718477" stopOpacity={0.0} />
                   </linearGradient>
                 </defs>
                 <XAxis
                   dataKey="date"
-                  tick={{ fontSize: 11, fill: '#6B6B6F' }}
-                  axisLine={false}
+                  tick={{ fill: '#71808A', fontSize: 11, fontFamily: 'monospace' }}
+                  axisLine={{ stroke: 'rgba(32, 33, 31, 0.1)' }}
                   tickLine={false}
                 />
                 <YAxis
-                  tick={{ fontSize: 11, fill: '#6B6B6F' }}
-                  axisLine={false}
+                  tick={{ fill: '#71808A', fontSize: 11, fontFamily: 'monospace' }}
+                  tickFormatter={(v) => `${Math.round(v * 100)}%`}
+                  axisLine={{ stroke: 'rgba(32, 33, 31, 0.1)' }}
                   tickLine={false}
-                  tickFormatter={val => `${Math.round(val * 100)}%`}
                 />
                 <Tooltip
-                  content={({ active, payload, label }) => {
+                  content={({ active, payload }) => {
                     if (active && payload && payload.length) {
-                      const rate = (payload[0].value as number) * 100;
+                      const val = (payload[0].value as number) * 100;
                       return (
-                        <div className="p-3 rounded-xl bg-white/95 dark:bg-[#181818]/95 backdrop-blur-xl border border-black/[0.06] dark:border-white/[0.1] shadow-dropdown text-xs">
-                          <p className="font-medium text-[#6B6B6F]">{label}</p>
-                          <p className="text-[#1D1D1F] dark:text-white font-semibold text-sm mt-0.5">{rate.toFixed(1)}% No-Show</p>
+                        <div className="p-3 rounded-xl bg-graphite-900 text-porcelain-100 text-xs font-mono shadow-spatial-card">
+                          <span>{payload[0].payload.date}: </span>
+                          <span className="font-bold text-sage-200">{val.toFixed(1)}% No-show</span>
                         </div>
                       );
                     }
@@ -194,150 +201,119 @@ export const AnalyticsPage: React.FC<AnalyticsPageProps> = ({ analytics }) => {
                 <Area
                   type="monotone"
                   dataKey="no_show_rate"
-                  stroke="#647A8A"
-                  strokeWidth={2}
+                  stroke="#40584B"
+                  strokeWidth={2.5}
                   fillOpacity={1}
-                  fill="url(#healthGradient)"
+                  fill="url(#colorNoShow)"
                 />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
 
-        {/* Minimal Risk Distribution Donut */}
-        <div className="lg:col-span-4 p-6 rounded-2xl bg-white/70 dark:bg-[#181818]/70 backdrop-blur-xl border border-white/60 dark:border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.03)] flex flex-col justify-between space-y-4">
-          <div>
-            <h3 className="text-sm font-semibold text-[#1D1D1F] dark:text-white">
+        {/* Right: Risk Distribution Minimal Donut */}
+        <div className="lg:col-span-4 p-8 rounded-3xl bg-stone-100 border border-stone-200 shadow-spatial-card flex flex-col justify-between space-y-4">
+          <div className="border-b border-stone-200/80 pb-4">
+            <span className="text-[10px] font-mono uppercase text-steel-500">
+              Active Patient Population
+            </span>
+            <h3 className="text-base font-bold text-graphite-900 mt-0.5">
               Risk Distribution
             </h3>
-            <p className="text-xs text-[#6B6B6F] mt-0.5">Ensemble probability clustering</p>
-
-            <div className="h-48 relative mt-2">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={donutData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={55}
-                    outerRadius={75}
-                    paddingAngle={4}
-                    dataKey="value"
-                  >
-                    {donutData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} stroke="transparent" />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-2xl font-semibold text-[#1D1D1F] dark:text-white">
-                  {analytics?.risk_distribution.total || 128}
-                </span>
-                <span className="text-[10px] uppercase font-semibold text-[#6B6B6F]">
-                  Total Slots
-                </span>
-              </div>
-            </div>
           </div>
 
-          <div className="space-y-2 pt-2 border-t border-black/[0.04] dark:border-white/[0.06] text-xs">
-            <div className="flex justify-between items-center">
-              <span className="text-[#6B6B6F]">Low Risk (&lt;40%)</span>
-              <span className="font-semibold text-[#4F8A70]">{analytics?.risk_distribution.low || 64}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-[#6B6B6F]">Medium Risk (40–69%)</span>
-              <span className="font-semibold text-[#C18A3A]">{analytics?.risk_distribution.medium || 38}</span>
-            </div>
-            <div className="flex justify-between items-center">
-              <span className="text-[#6B6B6F]">High Risk (≥70%)</span>
-              <span className="font-semibold text-[#C9685B]">{analytics?.risk_distribution.high || 26}</span>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Row 2: Department Rankings & Weekday Variance */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Department No-Show Rates */}
-        <div className="p-6 rounded-2xl bg-white/70 dark:bg-[#181818]/70 backdrop-blur-xl border border-white/60 dark:border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.03)] space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-black/[0.04] dark:border-white/[0.06]">
-            <div>
-              <h3 className="text-sm font-semibold text-[#1D1D1F] dark:text-white">
-                Department Variance
-              </h3>
-              <p className="text-xs text-[#6B6B6F] mt-0.5">Specialty non-attendance percentages</p>
-            </div>
-          </div>
-
-          <div className="space-y-3 pt-1">
-            {depts.map((d, i) => {
-              const pct = Math.round(d.no_show_rate * 100);
-              return (
-                <div key={i} className="space-y-1">
-                  <div className="flex justify-between text-xs font-medium">
-                    <span className="text-[#1D1D1F] dark:text-white">{d.name}</span>
-                    <span className="font-semibold text-[#1D1D1F] dark:text-white">{pct}%</span>
-                  </div>
-                  <div className="w-full h-1.5 rounded-full bg-black/[0.04] dark:bg-white/[0.06] overflow-hidden">
-                    <div
-                      className={`h-full rounded-full ${
-                        pct >= 24 ? 'bg-[#C9685B]' : pct >= 18 ? 'bg-[#C18A3A]' : 'bg-[#4F8A70]'
-                      }`}
-                      style={{ width: `${pct * 2.8}%` }}
-                    />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Day of Week Variance */}
-        <div className="p-6 rounded-2xl bg-white/70 dark:bg-[#181818]/70 backdrop-blur-xl border border-white/60 dark:border-white/10 shadow-[0_8px_30px_rgba(0,0,0,0.03)] space-y-4">
-          <div className="flex items-center justify-between pb-3 border-b border-black/[0.04] dark:border-white/[0.06]">
-            <div>
-              <h3 className="text-sm font-semibold text-[#1D1D1F] dark:text-white">
-                Weekday Drop-Off
-              </h3>
-              <p className="text-xs text-[#6B6B6F] mt-0.5">Attendance fluctuation across days of the week</p>
-            </div>
-            <span className="text-[10px] font-medium text-[#C9685B] px-2 py-0.5 rounded-full bg-[#C9685B]/10">
-              Friday Highest (28.9%)
-            </span>
-          </div>
-
-          <div className="h-56 mt-2">
+          <div className="h-52 w-full flex items-center justify-center">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={days} margin={{ top: 10, right: 10, left: -25, bottom: 0 }}>
-                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#6B6B6F' }} axisLine={false} tickLine={false} />
-                <YAxis
-                  tick={{ fontSize: 11, fill: '#6B6B6F' }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={val => `${Math.round(val * 100)}%`}
-                />
+              <PieChart>
+                <Pie
+                  data={donutData}
+                  cx="50%"
+                  cy="50%"
+                  innerRadius={55}
+                  outerRadius={75}
+                  paddingAngle={4}
+                  dataKey="value"
+                >
+                  {donutData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.color} />
+                  ))}
+                </Pie>
                 <Tooltip
-                  content={({ active, payload, label }) => {
+                  content={({ active, payload }) => {
                     if (active && payload && payload.length) {
-                      const rate = (payload[0].value as number) * 100;
                       return (
-                        <div className="p-3 rounded-xl bg-white/95 dark:bg-[#181818]/95 backdrop-blur-xl border border-black/[0.06] dark:border-white/[0.1] shadow-dropdown text-xs">
-                          <p className="font-medium text-[#6B6B6F]">{label}</p>
-                          <p className="text-[#1D1D1F] dark:text-white font-semibold text-sm mt-0.5">{rate.toFixed(1)}% Miss Rate</p>
+                        <div className="p-2.5 rounded-xl bg-graphite-900 text-porcelain-100 text-xs font-mono shadow-spatial-card">
+                          <span>{payload[0].name}: </span>
+                          <span className="font-bold">{payload[0].value} patients</span>
                         </div>
                       );
                     }
                     return null;
                   }}
                 />
-                <Bar dataKey="no_show_rate" fill="#647A8A" radius={[6, 6, 0, 0]} />
-              </BarChart>
+              </PieChart>
             </ResponsiveContainer>
           </div>
+
+          <div className="space-y-2 text-xs">
+            {donutData.map((d, i) => (
+              <div key={i} className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: d.color }} />
+                  <span className="text-charcoal-700">{d.name}</span>
+                </div>
+                <span className="font-mono font-bold text-graphite-900">{d.value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Department Patterns */}
+      <div className="p-8 rounded-3xl bg-stone-100 border border-stone-200 shadow-spatial-card space-y-4">
+        <div className="flex items-center justify-between border-b border-stone-200/80 pb-4">
+          <div>
+            <span className="text-[10px] font-mono uppercase text-steel-500">
+              Department Patterns
+            </span>
+            <h3 className="text-base font-bold text-graphite-900 mt-0.5">
+              Historical No-Show Rate by Specialty
+            </h3>
+          </div>
+        </div>
+
+        <div className="h-64 w-full pt-4">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={depts} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+              <XAxis
+                dataKey="name"
+                tick={{ fill: '#71808A', fontSize: 11 }}
+                axisLine={{ stroke: 'rgba(32, 33, 31, 0.1)' }}
+                tickLine={false}
+              />
+              <YAxis
+                tick={{ fill: '#71808A', fontSize: 11, fontFamily: 'monospace' }}
+                tickFormatter={(v) => `${Math.round(v * 100)}%`}
+                axisLine={{ stroke: 'rgba(32, 33, 31, 0.1)' }}
+                tickLine={false}
+              />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (active && payload && payload.length) {
+                    const val = (payload[0].value as number) * 100;
+                    return (
+                      <div className="p-3 rounded-xl bg-graphite-900 text-porcelain-100 text-xs font-mono shadow-spatial-card">
+                        <span>{payload[0].payload.name}: </span>
+                        <span className="font-bold text-amber-200">{val.toFixed(1)}% No-show</span>
+                      </div>
+                    );
+                  }
+                  return null;
+                }}
+              />
+              <Bar dataKey="no_show_rate" fill="#B18A52" radius={[6, 6, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
     </div>

@@ -8,12 +8,21 @@ from ..database import get_db
 from ..models import Appointment, Prediction, Patient, ModelMetric, SlotRecovery, Waitlist
 from ..schemas import AnalyticsDashboardResponse
 
+import time
+
 router = APIRouter(prefix="/analytics", tags=["Analytics"])
 
 METRICS_PATH = os.path.join(os.path.dirname(__file__), "..", "..", "models", "model_metrics.json")
 
+_analytics_cache = {"data": None, "timestamp": 0}
+CACHE_TTL_SECONDS = 3.0
+
 @router.get("", response_model=AnalyticsDashboardResponse)
 def get_analytics(db: Session = Depends(get_db)):
+    now_time = time.time()
+    if _analytics_cache["data"] and (now_time - _analytics_cache["timestamp"] < CACHE_TTL_SECONDS):
+        return _analytics_cache["data"]
+
     today_str = date.today().isoformat()
 
     all_appointments = db.query(Appointment).all()
@@ -145,7 +154,7 @@ def get_analytics(db: Session = Depends(get_db)):
         except Exception:
             pass
 
-    return {
+    result = {
         "kpis": {
             "today_appointments": today_count,
             "high_risk_appointments": high_risk_today,
@@ -168,3 +177,6 @@ def get_analytics(db: Session = Depends(get_db)):
         "time_heatmap": heatmap,
         "model_metrics": model_metrics
     }
+    _analytics_cache["data"] = result
+    _analytics_cache["timestamp"] = time.time()
+    return result

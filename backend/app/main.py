@@ -10,7 +10,7 @@ if os.path.exists(env_path):
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .database import engine, Base
-from .routes import auth, patients, appointments, predict, reminders, analytics, models_info, waitlist, slot_recovery, voice
+from .routes import auth, patients, appointments, predict, reminders, analytics, models_info, waitlist, slot_recovery, voice, whatsapp, queue, azure, events
 
 # Initialize database tables
 Base.metadata.create_all(bind=engine)
@@ -41,14 +41,18 @@ app.include_router(slot_recovery.router)
 app.include_router(analytics.router)
 app.include_router(models_info.router)
 app.include_router(voice.router)
+app.include_router(whatsapp.router)
+app.include_router(queue.router)
+app.include_router(azure.router)
+app.include_router(events.router)
 
 @app.get("/")
 def root():
     return {
-        "app": "AttendAI",
-        "tagline": "Missed Appointment Predictor",
+        "app": "SlotSure",
+        "tagline": "Clinical Operations & Smart Slot Recovery Platform",
         "status": "online",
-        "version": "1.0.0"
+        "version": "2.0.0"
     }
 
 @app.get("/health")

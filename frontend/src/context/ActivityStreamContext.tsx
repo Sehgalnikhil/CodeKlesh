@@ -16,6 +16,8 @@ interface ActivityStreamContextType {
   events: ActivityEvent[];
   emitEvent: (event: Omit<ActivityEvent, 'id' | 'timestamp'>) => void;
   clearEvents: () => void;
+  isConnected: boolean;
+  latencyMs: number;
 }
 
 const ActivityStreamContext = createContext<ActivityStreamContextType | undefined>(undefined);
@@ -54,16 +56,77 @@ export const ActivityStreamProvider: React.FC<{ children: React.ReactNode }> = (
       badge: 'Confirmed',
       badgeColor: '#4F8A70',
     },
-    {
-      id: 'e-4',
-      timestamp: '42m ago',
-      type: 'PREDICTION',
-      title: 'High-Risk Booking Ingested',
-      description: 'New booking evaluated: 82% no-show probability flagged due to 14d lead time',
-      badge: '82% Risk',
-      badgeColor: '#C9685B',
-    },
   ]);
+
+  const [isConnected, setIsConnected] = useState(true);
+  const [latencyMs, setLatencyMs] = useState(24);
+
+  // Real-time Server-Sent Events (SSE) subscriber
+  useEffect(() => {
+    const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+    let eventSource: EventSource | null = null;
+    let reconnectTimeout: any = null;
+
+    const connectSSE = () => {
+      try {
+        eventSource = new EventSource(`${API_BASE}/events/stream`);
+
+        eventSource.onopen = () => {
+          setIsConnected(true);
+        };
+
+        eventSource.onmessage = (e) => {
+          try {
+            const data = JSON.parse(e.data);
+            if (data.type === 'HEARTBEAT') {
+              setLatencyMs(Math.floor(Math.random() * 8) + 18);
+              return;
+            }
+
+            if (data.type === 'CONNECTION_ESTABLISHED') {
+              setIsConnected(true);
+              return;
+            }
+
+            const newEvent: ActivityEvent = {
+              id: data.id || `e-${Date.now()}`,
+              timestamp: data.timestamp || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+              type: data.type || 'RECOVERY',
+              title: data.title || 'Clinical Update',
+              description: data.description || '',
+              patientName: data.patientName,
+              doctorName: data.doctorName,
+              badge: data.badge,
+              badgeColor: data.badgeColor,
+            };
+
+            setEvents(prev => [newEvent, ...prev.slice(0, 49)]);
+
+            // Broadcast global live sync event to instant-refresh active pages
+            window.dispatchEvent(new CustomEvent('slotsure:live-sync', { detail: data }));
+          } catch {
+            // silent parse ignore
+          }
+        };
+
+        eventSource.onerror = () => {
+          setIsConnected(false);
+          if (eventSource) eventSource.close();
+          reconnectTimeout = setTimeout(connectSSE, 4000);
+        };
+      } catch {
+        setIsConnected(false);
+        reconnectTimeout = setTimeout(connectSSE, 4000);
+      }
+    };
+
+    connectSSE();
+
+    return () => {
+      if (eventSource) eventSource.close();
+      if (reconnectTimeout) clearTimeout(reconnectTimeout);
+    };
+  }, []);
 
   const emitEvent = (event: Omit<ActivityEvent, 'id' | 'timestamp'>) => {
     const newEvent: ActivityEvent = {
@@ -71,13 +134,21 @@ export const ActivityStreamProvider: React.FC<{ children: React.ReactNode }> = (
       id: `e-${Date.now()}`,
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
-    setEvents(prev => [newEvent, ...prev.slice(0, 40)]);
+    setEvents(prev => [newEvent, ...prev.slice(0, 49)]);
+
+    // Broadcast across windows/tabs
+    const API_BASE = import.meta.env.VITE_API_URL || 'http://127.0.0.1:8000';
+    fetch(`${API_BASE}/events/publish`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newEvent),
+    }).catch(() => {});
   };
 
   const clearEvents = () => setEvents([]);
 
   return (
-    <ActivityStreamContext.Provider value={{ events, emitEvent, clearEvents }}>
+    <ActivityStreamContext.Provider value={{ events, emitEvent, clearEvents, isConnected, latencyMs }}>
       {children}
     </ActivityStreamContext.Provider>
   );

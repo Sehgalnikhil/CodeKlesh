@@ -208,3 +208,75 @@ export interface ModelMetricsResponse {
   pr_curve: Array<{ recall: number; precision: number }>;
   disclaimer: string;
 }
+
+export interface WhatsAppNegotiateResponse {
+  appointment_id: number;
+  ai_response: string;
+  intent: string;
+  detected_language: string;
+  tool_calls: Array<{
+    tool: string;
+    parameters: Record<string, any>;
+    status: string;
+    [key: string]: any;
+  }>;
+  thought_trace: string[];
+  appointment_updated: boolean;
+  new_slot?: {
+    date: string;
+    time: string;
+    doctor: string;
+  };
+  swapped_with_waitlist?: {
+    waitlist_id: number;
+    patient_name: string;
+    priority: string;
+  };
+  revenue_protected: number;
+  confidence_score: number;
+}
+
+export interface QueueRadarMilestone {
+  step: number;
+  title: string;
+  subtitle: string;
+  completed: boolean;
+  current: boolean;
+  time: string;
+}
+
+export interface QueueRadarResponse {
+  appointment_id: number;
+  patient_id: number;
+  patient_name: string;
+  doctor_name: string;
+  department: string;
+  appointment_date: string;
+  appointment_time: string;
+  exam_room: string;
+  queue_position: number;
+  total_in_queue: number;
+  current_patient_in_room: string;
+  doctor_status: 'CONSULTING_NOW' | 'ON_SCHEDULE' | 'SLIGHT_DELAY' | string;
+  average_consult_duration_mins: number;
+  estimated_entry_time: string;
+  countdown_seconds: number;
+  milestones: QueueRadarMilestone[];
+  amenities: {
+    wifi_ssid: string;
+    wifi_pass: string;
+    cafeteria_discount: string;
+    pharmacy_pickup_lane: string;
+    parking_validated: boolean;
+  };
+  can_request_delay: boolean;
+}
+
+export interface QueueDelayResponse {
+  success: boolean;
+  message: string;
+  appointment_id: number;
+  new_appointment_time: string;
+  swapped_with: string;
+  delay_minutes_granted: number;
+}
